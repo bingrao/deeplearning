@@ -53,7 +53,7 @@ class Predictor:
             # decoder_outputs: (beam_size, target_seq_len=1, vocabulary_size)
             # attentions['std']: (target_seq_len=1, beam_size, source_seq_len)
 
-            attention = self.model.decoder.layers[-1].memory_attention_layer.sublayer.attention
+            attention = self.model.decoder.layers[-1].src_attn.sublayer.attention
             beam.advance(decoder_outputs.squeeze(1), attention)
 
             beam_current_origin = beam.get_current_origin()  # (beam_size, )
