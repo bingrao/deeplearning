@@ -58,9 +58,10 @@ class Sublayer(nn.Module):
 
 class Generator(nn.Module):
     "Define standard linear + softmax generation step."
-    def __init__(self, d_model, vocab):
+    def __init__(self, embedding):
         super(Generator, self).__init__()
-        self.proj = nn.Linear(d_model, vocab)
+        self.proj = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
+        self.weight = embedding.weight
 
     def forward(self, x):
         return F.log_softmax(self.proj(x), dim=-1)
@@ -252,11 +253,12 @@ class Decoder(nn.Module):
             [DecoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
         )
 
+        # Generator Solution 1
+        self.generator = Generator(embedding)
+
+        # Generator Solution 2
         # self.generator = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
-
-        self.generator = Generator(embedding.embedding_dim, embedding.num_embeddings)
-
-        self.generator.weight = self.embedding.weight
+        # self.generator.weight = self.embedding.weight
 
     def forward(self, x, memory, src_mask, tgt_mask=None, state=None):
         # x: (batch_size, seq_len - 1, d_model)
