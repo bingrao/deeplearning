@@ -1,170 +1,28 @@
-from embeddings import PositionalEncoding
-from utils.pad import pad_masking, subsequent_masking
-
 import torch
 from torch import nn
 import numpy as np
-from collections import defaultdict
 import math, copy, time
 import torch.nn.functional as F
-
+from collections import defaultdict
+from embeddings import PositionalEncoding
+from utils.pad import pad_masking, subsequent_masking
 PAD_TOKEN_ID = 0
 
 
-class Transformer(nn.Module):
-
-    def __init__(self, encoder, decoder):
-        super(Transformer, self).__init__()
-
-        self.encoder = encoder
-        self.decoder = decoder
-
-    def forward(self, sources, inputs):
-        # sources : (batch_size, sources_len)
-        # inputs : (batch_size, targets_len - 1)
-        batch_size, sources_len = sources.size()
-        batch_size, inputs_len = inputs.size()
-
-        sources_mask = pad_masking(sources, sources_len)
-        memory_mask = pad_masking(sources, inputs_len)
-        inputs_mask = subsequent_masking(inputs) | pad_masking(inputs, inputs_len)
-
-        # (batch_size, seq_len, d_model)
-        memory = self.encoder(sources, sources_mask)  # Context Vectors
-
-        # (batch_size, seq_len, d_model)
-        outputs, state = self.decoder(inputs, memory, memory_mask, inputs_mask)
-        return outputs
-
-
 class LayerNorm(nn.Module):
-    "Construct a layernorm module (See citation for details)."
-    def __init__(self, features, eps=1e-6):
+
+    def __init__(self, features_count, epsilon=1e-6):
         super(LayerNorm, self).__init__()
-        self.a_2 = nn.Parameter(torch.ones(features))
-        self.b_2 = nn.Parameter(torch.zeros(features))
-        self.eps = eps
+
+        self.gain = nn.Parameter(torch.ones(features_count))
+        self.bias = nn.Parameter(torch.zeros(features_count))
+        self.epsilon = epsilon
 
     def forward(self, x):
-        mean = x.mean(-1, keepdim=True)
-        std = x.std(-1, keepdim=True)
-        return self.a_2 * (x - mean) / (std + self.eps) + self.b_2
+        mean = x.mean(dim=-1, keepdim=True)
+        std = x.std(dim=-1, keepdim=True)
 
-
-class Encoder(nn.Module):
-
-    def __init__(self, layers_count, d_model, heads_count, d_ff, dropout_prob, embedding):
-        super(Encoder, self).__init__()
-
-        self.d_model = d_model
-        self.embedding = embedding
-        self.layers = nn.ModuleList(
-            [EncoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
-        )
-        # self.norm = LayerNorm(layer.size)
-
-    def forward(self, sources, mask):
-        """
-        args:
-           sources: embedded_sequence, (batch_size, seq_len, embed_size)
-        """
-        sources = self.embedding(sources)
-
-        for layer in self.layers:
-            sources = layer(sources, mask)
-
-        return sources
-
-
-class EncoderLayer(nn.Module):
-    def __init__(self, d_model, heads_count, d_ff, dropout_prob):
-        super(EncoderLayer, self).__init__()
-
-        self.self_attn = Sublayer(MultiHeadedAttention(heads_count, d_model, dropout_prob), d_model)
-        self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
-        self.dropout = nn.Dropout(dropout_prob)
-        self.sublayer = SublayerConnection
-
-    def forward(self, sources, sources_mask):
-        # x: (batch_size, seq_len, d_model)
-
-        sources = self.self_attn(sources, sources, sources, sources_mask)
-        sources = self.dropout(sources)
-        sources = self.feed_forward(sources)
-
-        return sources
-
-
-class Decoder(nn.Module):
-    def __init__(self, layers_count, d_model, heads_count, d_ff, dropout_prob, embedding):
-        super(Decoder, self).__init__()
-
-        self.d_model = d_model
-        self.embedding = embedding
-        self.layers = nn.ModuleList(
-            [DecoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
-        )
-        self.generator = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
-        self.generator.weight = self.embedding.weight
-
-    def forward(self, inputs, memory, memory_mask, inputs_mask=None, state=None):
-        # inputs: (batch_size, seq_len - 1, d_model)
-        # memory: (batch_size, seq_len, d_model)
-
-        inputs = self.embedding(inputs)
-        # if state is not None:
-        #     inputs = torch.cat([state.previous_inputs, inputs], dim=1)
-        #
-        #     state.previous_inputs = inputs
-
-        for layer_index, decoder_layer in enumerate(self.layers):
-            if state is None:
-                inputs = decoder_layer(inputs, memory, memory_mask, inputs_mask)
-            else:  # Use cache
-                layer_cache = state.layer_caches[layer_index]
-                # print('inputs_mask', inputs_mask)
-                inputs = decoder_layer(inputs, memory, memory_mask, inputs_mask, layer_cache)
-
-                state.update_state(
-                    layer_index=layer_index,
-                    layer_mode='self-attention',
-                    key_projected=decoder_layer.self_attn.sublayer.key_projected,
-                    value_projected=decoder_layer.self_attn.sublayer.value_projected,
-                )
-                state.update_state(
-                    layer_index=layer_index,
-                    layer_mode='memory-attention',
-                    key_projected=decoder_layer.src_attn.sublayer.key_projected,
-                    value_projected=decoder_layer.src_attn.sublayer.value_projected,
-                )
-
-        generated = self.generator(inputs)  # (batch_size, seq_len, vocab_size)
-        return generated, state
-
-    def init_decoder_state(self, **args):
-        return DecoderState()
-
-
-class DecoderLayer(nn.Module):
-    """Decoder is made of self-attn, src-attn, and feed forward (defined below)"""
-
-    def __init__(self, d_model, heads_count, d_ff, dropout_prob):
-        super(DecoderLayer, self).__init__()
-        self.self_attn = Sublayer(
-            MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='self-attention'), d_model)
-        self.src_attn = Sublayer(
-            MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='memory-attention'), d_model)
-        self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
-        self.sublayer = SublayerConnection
-
-    def forward(self, inputs, memory, memory_mask, inputs_mask, layer_cache=None):
-        # print('self attention')
-        # print('inputs_mask', inputs_mask)
-        inputs = self.self_attn(inputs, inputs, inputs, inputs_mask, layer_cache)
-        # print('memory attention')
-        inputs = self.src_attn(inputs, memory, memory, memory_mask, layer_cache)
-        inputs = self.feed_forward(inputs)
-        return inputs
+        return self.gain * (x - mean) / (std + self.epsilon) + self.bias
 
 
 class SublayerConnection(nn.Module):
@@ -193,22 +51,6 @@ class Sublayer(nn.Module):
         x = args[0]
         x = self.sublayer(*args) + x
         return self.layer_normalization(x)
-
-
-class LayerNorm(nn.Module):
-
-    def __init__(self, features_count, epsilon=1e-6):
-        super(LayerNorm, self).__init__()
-
-        self.gain = nn.Parameter(torch.ones(features_count))
-        self.bias = nn.Parameter(torch.zeros(features_count))
-        self.epsilon = epsilon
-
-    def forward(self, x):
-        mean = x.mean(dim=-1, keepdim=True)
-        std = x.std(dim=-1, keepdim=True)
-
-        return self.gain * (x - mean) / (std + self.epsilon) + self.bias
 
 
 class MultiHeadedAttention(nn.Module):
@@ -350,6 +192,119 @@ class PointwiseFeedForwardNetwork(nn.Module):
         return self.feed_forward(x)
 
 
+class Encoder(nn.Module):
+    def __init__(self, layers_count, d_model, heads_count, d_ff, dropout_prob, embedding):
+        super(Encoder, self).__init__()
+        self.d_model = d_model
+        self.embedding = embedding
+        self.layers = nn.ModuleList(
+            [EncoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
+        )
+        # self.norm = LayerNorm(layer.size)
+
+    def forward(self, sources, mask):
+        """
+        args:
+           sources: embedded_sequence, (batch_size, seq_len, embed_size)
+        """
+        sources = self.embedding(sources)
+
+        for layer in self.layers:
+            sources = layer(sources, mask)
+
+        return sources
+
+
+class EncoderLayer(nn.Module):
+    def __init__(self, d_model, heads_count, d_ff, dropout_prob):
+        super(EncoderLayer, self).__init__()
+
+        self.self_attn = Sublayer(MultiHeadedAttention(heads_count, d_model, dropout_prob), d_model)
+        self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
+        self.dropout = nn.Dropout(dropout_prob)
+        self.sublayer = SublayerConnection
+
+    def forward(self, sources, sources_mask):
+        # x: (batch_size, seq_len, d_model)
+
+        sources = self.self_attn(sources, sources, sources, sources_mask)
+        sources = self.dropout(sources)
+        sources = self.feed_forward(sources)
+
+        return sources
+
+
+class Decoder(nn.Module):
+    def __init__(self, layers_count, d_model, heads_count, d_ff, dropout_prob, embedding):
+        super(Decoder, self).__init__()
+        self.d_model = d_model
+        self.embedding = embedding
+        self.layers = nn.ModuleList(
+            [DecoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
+        )
+        self.generator = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
+        self.generator.weight = self.embedding.weight
+
+    def forward(self, inputs, memory, memory_mask, inputs_mask=None, state=None):
+        # inputs: (batch_size, seq_len - 1, d_model)
+        # memory: (batch_size, seq_len, d_model)
+
+        inputs = self.embedding(inputs)
+        # if state is not None:
+        #     inputs = torch.cat([state.previous_inputs, inputs], dim=1)
+        #
+        #     state.previous_inputs = inputs
+
+        for layer_index, decoder_layer in enumerate(self.layers):
+            if state is None:
+                inputs = decoder_layer(inputs, memory, memory_mask, inputs_mask)
+            else:  # Use cache
+                layer_cache = state.layer_caches[layer_index]
+                # print('inputs_mask', inputs_mask)
+                inputs = decoder_layer(inputs, memory, memory_mask, inputs_mask, layer_cache)
+
+                state.update_state(
+                    layer_index=layer_index,
+                    layer_mode='self-attention',
+                    key_projected=decoder_layer.self_attn.sublayer.key_projected,
+                    value_projected=decoder_layer.self_attn.sublayer.value_projected,
+                )
+                state.update_state(
+                    layer_index=layer_index,
+                    layer_mode='memory-attention',
+                    key_projected=decoder_layer.src_attn.sublayer.key_projected,
+                    value_projected=decoder_layer.src_attn.sublayer.value_projected,
+                )
+
+        generated = self.generator(inputs)  # (batch_size, seq_len, vocab_size)
+        return generated, state
+
+    def init_decoder_state(self, **args):
+        return DecoderState()
+
+
+class DecoderLayer(nn.Module):
+    """
+        Decoder is made of self-attn, src-attn, and feed forward (defined below)
+    """
+    def __init__(self, d_model, heads_count, d_ff, dropout_prob):
+        super(DecoderLayer, self).__init__()
+        self.self_attn = Sublayer(
+            MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='self-attention'), d_model)
+        self.src_attn = Sublayer(
+            MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='memory-attention'), d_model)
+        self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
+        self.sublayer = SublayerConnection
+
+    def forward(self, inputs, memory, memory_mask, inputs_mask, layer_cache=None):
+        # print('self attention')
+        # print('inputs_mask', inputs_mask)
+        inputs = self.self_attn(inputs, inputs, inputs, inputs_mask, layer_cache)
+        # print('memory attention')
+        inputs = self.src_attn(inputs, memory, memory, memory_mask, layer_cache)
+        inputs = self.feed_forward(inputs)
+        return inputs
+
 class DecoderState:
 
     def __init__(self):
@@ -373,6 +328,31 @@ class DecoderState:
                         cache = self.layer_caches[layer_index][mode][projection]
                         if cache is not None:
                             cache.data.copy_(cache.data.index_select(0, positions))
+
+
+class Transformer(nn.Module):
+    def __init__(self, encoder, decoder):
+        super(Transformer, self).__init__()
+
+        self.encoder = encoder
+        self.decoder = decoder
+
+    def forward(self, sources, inputs):
+        # sources : (batch_size, sources_len)
+        # inputs : (batch_size, targets_len - 1)
+        batch_size, sources_len = sources.size()
+        batch_size, inputs_len = inputs.size()
+
+        sources_mask = pad_masking(sources, sources_len)
+        memory_mask = pad_masking(sources, inputs_len)
+        inputs_mask = subsequent_masking(inputs) | pad_masking(inputs, inputs_len)
+
+        # (batch_size, seq_len, d_model)
+        memory = self.encoder(sources, sources_mask)  # Context Vectors
+
+        # (batch_size, seq_len, d_model)
+        outputs, state = self.decoder(inputs, memory, memory_mask, inputs_mask)
+        return outputs
 
 
 def build_model(config, source_vocabulary_size, target_vocabulary_size):
