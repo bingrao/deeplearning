@@ -17,7 +17,9 @@ This repo focuses on clean, readable, and modular implementation of the paper.
 ### Prepare datasets
 This repo comes with example data in `data/` directory. To begin, you will need to prepare datasets with given data as follows:
 ```
-$ python prepare_datasets.py --train_source=data/example/raw/src-train.txt --train_target=data/example/raw/tgt-train.txt --val_source=data/example/raw/src-val.txt --val_target=data/example/raw/tgt-val.txt --save_data_dir=data/example/processed
+$ python datasets.py --train_source=data/example/raw/src-train.txt --train_target=data/example/raw/tgt-train.txt --val_source=data/example/raw/src-val.txt --val_target=data/example/raw/tgt-val.txt --save_data_dir=data/example/processed
+OR
+$ sh datasets.sh
 ```
 
 The example data is brought from [OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py).
@@ -35,6 +37,8 @@ To train model, provide the train script with a path to processed data and save 
 
 ```
 $ python train.py --data_dir=data/example/processed --save_config=checkpoints/example_config.json --save_checkpoint=checkpoints/example_model.pth --save_log=logs/example.log 
+OR
+$ sh train.sh
 ```
 
 This saves model config and checkpoints to given files, respectively.
@@ -45,7 +49,8 @@ For example, add `--epochs=300` to set the number of epochs to 300.
 To translate a sentence in source language to target language:
 ```
 $ python predict.py --source="There is an imbalance here ." --config=checkpoints/example_config.json --checkpoint=checkpoints/example_model.pth
-
+OR
+$ sh predict.sh
 Candidate 0 : Hier fehlt das Gleichgewicht .
 Candidate 1 : Hier fehlt das das Gleichgewicht .
 Candidate 2 : Hier fehlt das das das Gleichgewicht .
@@ -60,6 +65,9 @@ To calculate BLEU score of a trained model:
 $ python evaluate.py --save_result=logs/example_eval.txt --config=checkpoints/example_config.json --checkpoint=checkpoints/example_model.pth
 
 BLEU score : 0.0007947
+
+OR
+$ sh evaluate.sh
 ```
 
 ## File description
@@ -70,8 +78,6 @@ BLEU score : 0.0007947
 - `metrics.py` contains accuracy metric.
 - `beam.py` contains beam search.
 - `datasets.py` has code for loading and processing data. 
-- `trainer.py` has code for training model.
-- `prepare_datasets.py` processes data.
 - `train.py` trains model.
 - `predict.py` translates given source sentence with a trained model.
 - `evaluate.py` calculates BLEU score of a trained model.
