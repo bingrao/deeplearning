@@ -1,58 +1,83 @@
+# Transformer-pytorch
+A PyTorch implementation of Transformer in "Attention is All You Need" (https://arxiv.org/abs/1706.03762)
 
-Application with Internal Packages
-===
+This repo focuses on clean, readable, and modular implementation of the paper.
 
-In larger applications, you may have one or more internal packages that are either tied together with a main runner script or that provide specific functionality to a larger library you are packaging.
+<img width="559" alt="screen shot 2018-09-27 at 1 49 14 pm" src="https://user-images.githubusercontent.com/2340721/46123973-44b08900-c25c-11e8-9468-7aef9e4e3f18.png">
 
+## Requirements
+- Python 3.6+
+- [PyTorch 4.1+](http://pytorch.org/)
+- [NumPy](http://www.numpy.org/)
+- [NLTK](https://www.nltk.org/)
+- [tqdm](https://github.com/tqdm/tqdm)
+
+## Usage
+
+### Prepare datasets
+This repo comes with example data in `data/` directory. To begin, you will need to prepare datasets with given data as follows:
 ```
-python-project-template
-├── LICENSE
-├── Makefile
-├── README.md
-├── bin
-├── data
-├── docs
-│   ├── Makefile
-│   ├── conf.py
-│   ├── index.rst
-│   └── make.bat
-├── requirements.txt
-├── setup.py
-├── src
-│   ├── __init__.py
-│   ├── hello
-│   │   ├── __init__.py
-│   │   ├── hello.py
-│   │   └── helpers.py
-│   ├── runner.py
-│   └── world
-│       ├── __init__.py
-│       ├── helpers.py
-│       └── world.py
-└── tests
-    ├── __init__.py
-    ├── context.py
-    ├── test_advanced.py
-    └── test_basic.py
+$ python prepare_datasets.py --train_source=data/example/raw/src-train.txt --train_target=data/example/raw/tgt-train.txt --val_source=data/example/raw/src-val.txt --val_target=data/example/raw/tgt-val.txt --save_data_dir=data/example/processed
 ```
 
-* **bin/**  : This directory holds any executable files. The most important point to remember is that your executable shouldn’t have a lot of code, just an import and a call to a main function in your runner script. If you are using pure Python or don’t have any executable files, you can leave out this directory.
-* **data/** : Having this directory is helpful for testing. It’s a central location for any files that your application will ingest or produce. Depending on how you deploy your application, you can keep “production-level” inputs and outputs pointed to this directory, or only use it for internal testing.
-* **docs/** : With a more advanced application, you’ll want to maintain good documentation of all its parts. I like to put any documentation for internal modules here, which is why you see separate documents for the hello and world packages. If you use docstrings in your internal modules (and you should!), your whole-module documentation should at the very least give a holistic view of the purpose and function of the module.
-* **src/**  : The directory contains source code, but now there are subdirectories. As you add more complexity, you’ll want to use a “divide and conquer” tactic and split out parts of your application logic into more manageable chunks. Remember that the directory name refers to the overall package name, and so the subdirectory names (hello/ and world/) should reflect their package names.
-* **test/** : Here, you can put all your tests—unit tests, execution tests, integration tests, and so on. Feel free to structure this directory in the most convenient way for your testing strategies, import strategies, and more.
-* **LICENSE** : The license for this project
-* **Makefile** : A makefile to compile this project
-* **requirements.txt** : A list of required python packages
-* **setup.py** : A setup file for python projects
-* **README.md** : A readme file
+The example data is brought from [OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py).
+The data consists of parallel source (src) and target (tgt) data for training and validation.
+A data file contains one sentence per line with tokens separated by a space.
+Below are the provided example data files.
 
+- `src-train.txt`
+- `tgt-train.txt`
+- `src-val.txt`
+- `tgt-val.txt`
 
-How to install this python package
-===
+### Train model
+To train model, provide the train script with a path to processed data and save files as follows:
 
-How to execute this project in Unix/Linux Environment
-===
-```batch
-python3 src/runner.py
 ```
+$ python train.py --data_dir=data/example/processed --save_config=checkpoints/example_config.json --save_checkpoint=checkpoints/example_model.pth --save_log=logs/example.log 
+```
+
+This saves model config and checkpoints to given files, respectively.
+You can play around with hyperparameters of the model with command line arguments. 
+For example, add `--epochs=300` to set the number of epochs to 300. 
+
+### Translate
+To translate a sentence in source language to target language:
+```
+$ python predict.py --source="There is an imbalance here ." --config=checkpoints/example_config.json --checkpoint=checkpoints/example_model.pth
+
+Candidate 0 : Hier fehlt das Gleichgewicht .
+Candidate 1 : Hier fehlt das das Gleichgewicht .
+Candidate 2 : Hier fehlt das das das Gleichgewicht .
+```
+
+It will give you translation candidates of the given source sentence.
+You can adjust the number of candidates with command line argument. 
+
+### Evaluate
+To calculate BLEU score of a trained model:
+```
+$ python evaluate.py --save_result=logs/example_eval.txt --config=checkpoints/example_config.json --checkpoint=checkpoints/example_model.pth
+
+BLEU score : 0.0007947
+```
+
+## File description
+- `models.py` includes Transformer's encoder, decoder, and multi-head attention.
+- `embeddings.py` contains positional encoding.
+- `losses.py` contains label smoothing loss.
+- `optimizers.py` contains Noam optimizer.
+- `metrics.py` contains accuracy metric.
+- `beam.py` contains beam search.
+- `datasets.py` has code for loading and processing data. 
+- `trainer.py` has code for training model.
+- `prepare_datasets.py` processes data.
+- `train.py` trains model.
+- `predict.py` translates given source sentence with a trained model.
+- `evaluate.py` calculates BLEU score of a trained model.
+
+## Reference
+- [OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py)
+
+## Author
+[@dreamgonfly](https://github.com/dreamgonfly)
