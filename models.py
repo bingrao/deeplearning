@@ -10,7 +10,10 @@ PAD_TOKEN_ID = 0
 
 
 class LayerNorm(nn.Module):
-
+    """
+    Construct a layernorm module
+    (See citation for details: https://arxiv.org/abs/1607.06450).
+    """
     def __init__(self, features_count, epsilon=1e-6):
         super(LayerNorm, self).__init__()
 
@@ -29,6 +32,7 @@ class SublayerConnection(nn.Module):
     """
     A residual connection followed by a layer norm.
     Note for code simplicity the norm is first as opposed to last.
+    (See citation for details: https://arxiv.org/abs/1512.03385).
     """
     def __init__(self, size, dropout):
         super(SublayerConnection, self).__init__()
@@ -43,14 +47,13 @@ class SublayerConnection(nn.Module):
 class Sublayer(nn.Module):
     def __init__(self, sublayer, d_model):
         super(Sublayer, self).__init__()
-
+        self.norm = LayerNorm(d_model)
         self.sublayer = sublayer
-        self.layer_normalization = LayerNorm(d_model)
 
     def forward(self, *args):
         x = args[0]
         x = self.sublayer(*args) + x
-        return self.layer_normalization(x)
+        return self.norm(x)
 
 
 class MultiHeadedAttention(nn.Module):
@@ -200,7 +203,6 @@ class Encoder(nn.Module):
         self.layers = nn.ModuleList(
             [EncoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
         )
-        # self.norm = LayerNorm(layer.size)
 
     def forward(self, sources, mask):
         """
@@ -222,16 +224,13 @@ class EncoderLayer(nn.Module):
         self.self_attn = Sublayer(MultiHeadedAttention(heads_count, d_model, dropout_prob), d_model)
         self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
         self.dropout = nn.Dropout(dropout_prob)
-        self.sublayer = SublayerConnection
 
-    def forward(self, sources, sources_mask):
+    def forward(self, x, mask):
         # x: (batch_size, seq_len, d_model)
-
-        sources = self.self_attn(sources, sources, sources, sources_mask)
-        sources = self.dropout(sources)
-        sources = self.feed_forward(sources)
-
-        return sources
+        x = self.self_attn(x, x, x, mask)
+        x = self.dropout(x)
+        x = self.feed_forward(x)
+        return x
 
 
 class Decoder(nn.Module):
@@ -245,23 +244,23 @@ class Decoder(nn.Module):
         self.generator = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
         self.generator.weight = self.embedding.weight
 
-    def forward(self, inputs, memory, memory_mask, inputs_mask=None, state=None):
-        # inputs: (batch_size, seq_len - 1, d_model)
+    def forward(self, x, memory, src_mask, tgt_mask=None, state=None):
+        # x: (batch_size, seq_len - 1, d_model)
         # memory: (batch_size, seq_len, d_model)
 
-        inputs = self.embedding(inputs)
+        x = self.embedding(x)
         # if state is not None:
-        #     inputs = torch.cat([state.previous_inputs, inputs], dim=1)
+        #     x = torch.cat([state.previous_inputs, x], dim=1)
         #
-        #     state.previous_inputs = inputs
+        #     state.previous_inputs = x
 
         for layer_index, decoder_layer in enumerate(self.layers):
             if state is None:
-                inputs = decoder_layer(inputs, memory, memory_mask, inputs_mask)
+                x = decoder_layer(x, memory, src_mask, tgt_mask)
             else:  # Use cache
                 layer_cache = state.layer_caches[layer_index]
                 # print('inputs_mask', inputs_mask)
-                inputs = decoder_layer(inputs, memory, memory_mask, inputs_mask, layer_cache)
+                x = decoder_layer(x, memory, src_mask, tgt_mask, layer_cache)
 
                 state.update_state(
                     layer_index=layer_index,
@@ -276,7 +275,7 @@ class Decoder(nn.Module):
                     value_projected=decoder_layer.src_attn.sublayer.value_projected,
                 )
 
-        generated = self.generator(inputs)  # (batch_size, seq_len, vocab_size)
+        generated = self.generator(x)  # (batch_size, seq_len, vocab_size)
         return generated, state
 
     def init_decoder_state(self, **args):
@@ -285,7 +284,7 @@ class Decoder(nn.Module):
 
 class DecoderLayer(nn.Module):
     """
-        Decoder is made of self-attn, src-attn, and feed forward (defined below)
+    Decoder is made of self-attn, src-attn, and feed forward
     """
     def __init__(self, d_model, heads_count, d_ff, dropout_prob):
         super(DecoderLayer, self).__init__()
@@ -294,16 +293,16 @@ class DecoderLayer(nn.Module):
         self.src_attn = Sublayer(
             MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='memory-attention'), d_model)
         self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
-        self.sublayer = SublayerConnection
 
-    def forward(self, inputs, memory, memory_mask, inputs_mask, layer_cache=None):
+    def forward(self, x, memory, src_mask, tgt_mask, layer_cache=None):
         # print('self attention')
         # print('inputs_mask', inputs_mask)
-        inputs = self.self_attn(inputs, inputs, inputs, inputs_mask, layer_cache)
+        x = self.self_attn(x, x, x, tgt_mask, layer_cache)
         # print('memory attention')
-        inputs = self.src_attn(inputs, memory, memory, memory_mask, layer_cache)
-        inputs = self.feed_forward(inputs)
-        return inputs
+        x = self.src_attn(x, memory, memory, src_mask, layer_cache)
+        x = self.feed_forward(x)
+        return x
+
 
 class DecoderState:
 
