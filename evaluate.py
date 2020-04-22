@@ -13,7 +13,6 @@ from tqdm import tqdm
 
 
 class Evaluator:
-
     def __init__(self, predictor, save_filepath):
 
         self.predictor = predictor
@@ -49,48 +48,48 @@ class Evaluator:
         return bleu_score
 
 
-parser = ArgumentParser(description='Predict translation')
-parser.add_argument('--save_result', type=str, default=None)
-parser.add_argument('--config', type=str, required=True)
-parser.add_argument('--checkpoint', type=str, required=True)
-parser.add_argument('--phase', type=str, default='val', choices=['train', 'val'])
+if __name__ == "__main__":
 
-args = parser.parse_args()
-with open(args.config) as f:
-    config = json.load(f)
+    parser = ArgumentParser(description='Predict translation')
+    parser.add_argument('--save_result', type=str, default='logs/example_eval.txt')
+    parser.add_argument('--config', type=str, required=True, default='checkpoints/example_config.json')
+    parser.add_argument('--checkpoint', type=str, required=True, default='checkpoints/example_model.pth')
+    parser.add_argument('--phase', type=str, default='val', choices=['train', 'val'])
 
-print('Constructing dictionaries...')
-source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
-target_dictionary = IndexDictionary.load(config['data_dir'], mode='target', vocabulary_size=config['vocabulary_size'])
+    args = parser.parse_args()
+    with open(args.config) as f:
+        config = json.load(f)
 
-print('Building model...')
-model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
+    print('Constructing dictionaries...')
+    source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
+    target_dictionary = IndexDictionary.load(config['data_dir'], mode='target', vocabulary_size=config['vocabulary_size'])
 
-predictor = Predictor(
-    preprocess=IndexedInputTargetTranslationDataset.preprocess(source_dictionary),
-    postprocess=lambda x: ' '.join([token for token in target_dictionary.tokenify_indexes(x) if token != '<EndSent>']),
-    model=model,
-    checkpoint_filepath=args.checkpoint
-)
+    print('Building model...')
+    model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
-timestamp = datetime.now()
-if args.save_result is None:
-    eval_filepath = 'logs/eval-{config}-time={timestamp}.csv'.format(
-        config=args.config.replace('/', '-'),
-        timestamp=timestamp.strftime("%Y_%m_%d_%H_%M_%S"))
-else:
-    eval_filepath = args.save_result
+    predictor = Predictor(
+        preprocess=IndexedInputTargetTranslationDataset.preprocess(source_dictionary),
+        postprocess=lambda x: ' '.join([token for token in target_dictionary.tokenify_indexes(x) if token != '<EndSent>']),
+        model=model,
+        checkpoint_filepath=args.checkpoint
+    )
 
-evaluator = Evaluator(
-    predictor=predictor,
-    save_filepath=eval_filepath
-)
+    timestamp = datetime.now()
+    if args.save_result is None:
+        eval_filepath = 'logs/eval-{config}-time={timestamp}.csv'.format(
+            config=args.config.replace('/', '-'),
+            timestamp=timestamp.strftime("%Y_%m_%d_%H_%M_%S"))
+    else:
+        eval_filepath = args.save_result
 
-print('Evaluating...')
-test_dataset = TranslationDataset(config['data_dir'], args.phase, limit=1000)
-bleu_score = evaluator.evaluate_dataset(test_dataset)
-print('Evaluation time :', datetime.now() - timestamp)
+    evaluator = Evaluator(
+        predictor=predictor,
+        save_filepath=eval_filepath
+    )
 
-print("BLEU score :", bleu_score)
+    print('Evaluating...')
+    test_dataset = TranslationDataset(config['data_dir'], args.phase, limit=1000)
+    bleu_score = evaluator.evaluate_dataset(test_dataset)
+    print('Evaluation time :', datetime.now() - timestamp)
 
-
+    print("BLEU score :", bleu_score)
