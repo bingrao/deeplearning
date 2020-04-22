@@ -1,2 +1,4 @@
+scipy
 nose
 sphinx
+numpy
