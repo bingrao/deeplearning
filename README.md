@@ -78,6 +78,8 @@ BLEU score : 0.0007947
 
 ## Reference
 - [OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py)
+- [The Annotated Transformer](https://nlp.seas.harvard.edu/2018/04/03/attention.html)
+
 
 ## Author
-[@dreamgonfly](https://github.com/dreamgonfly)
+[@Bing](https://github.com/bingrao)
