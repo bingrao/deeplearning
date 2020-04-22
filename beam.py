@@ -23,8 +23,6 @@ class Beam:
 
         self.finished = []
 
-
-
         # Time and k pair for finished.
         self.finished = []
         self.n_top = n_top

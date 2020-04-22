@@ -1,3 +1,6 @@
+nltk
+tqdm
+torch
 scipy
 nose
 sphinx
