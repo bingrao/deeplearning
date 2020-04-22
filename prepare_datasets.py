@@ -8,11 +8,11 @@ from utils.pipe import shared_tokens_generator, source_tokens_generator, target_
 from argparse import ArgumentParser
 
 parser = ArgumentParser('Prepare datasets')
-parser.add_argument('--train_source', type=str, default='../data/example/raw/src-train.txt')
-parser.add_argument('--train_target', type=str, default='../data/example/raw/tgt-train.txt')
-parser.add_argument('--val_source', type=str, default='../data/example/raw/src-val.txt')
-parser.add_argument('--val_target', type=str, default='../data/example/raw/tgt-val.txt')
-parser.add_argument('--save_data_dir', type=str, default='../data/example/processed')
+parser.add_argument('--train_source', type=str, default='data/example/raw/src-train.txt')
+parser.add_argument('--train_target', type=str, default='data/example/raw/tgt-train.txt')
+parser.add_argument('--val_source', type=str, default='data/example/raw/src-val.txt')
+parser.add_argument('--val_target', type=str, default='data/example/raw/tgt-val.txt')
+parser.add_argument('--save_data_dir', type=str, default='data/example/processed')
 parser.add_argument('--share_dictionary', type=bool, default=False)
 
 args = parser.parse_args()
