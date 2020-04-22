@@ -68,8 +68,7 @@ class Generator(nn.Module):
 
 
 class MultiHeadedAttention(nn.Module):
-
-    def __init__(self, heads_count, d_model, dropout_prob, mode='self-attention'):
+    def __init__(self, heads_count, d_model, dropout_prob=0.1, mode='self-attention'):
         super(MultiHeadedAttention, self).__init__()
 
         assert d_model % heads_count == 0
@@ -78,14 +77,16 @@ class MultiHeadedAttention(nn.Module):
         self.d_head = d_model // heads_count
         self.heads_count = heads_count
         self.mode = mode
+
         self.query_projection = nn.Linear(d_model, heads_count * self.d_head)
-        self.key_projection = nn.Linear(d_model, heads_count * self.d_head)
+        self.key_projection =   nn.Linear(d_model, heads_count * self.d_head)
         self.value_projection = nn.Linear(d_model, heads_count * self.d_head)
         self.final_projection = nn.Linear(d_model, heads_count * self.d_head)
-        self.dropout = nn.Dropout(dropout_prob)
-        self.softmax = nn.Softmax(dim=3)
 
         self.attention = None
+        self.dropout = nn.Dropout(p=dropout_prob)
+        self.softmax = nn.Softmax(dim=3)
+
         # For cache
         self.key_projected = None
         self.value_projected = None
@@ -104,15 +105,14 @@ class MultiHeadedAttention(nn.Module):
 
     def forward(self, query, key, value, mask=None, layer_cache=None):
         """
-
         Args:
-            query: (batch_size, query_len, model_dim)
-            key: (batch_size, key_len, model_dim)
-            value: (batch_size, value_len, model_dim)
-            mask: (batch_size, query_len, key_len)
-            state: DecoderState
+            :param query: (batch_size, query_len, model_dim)
+            :param key: (batch_size, key_len, model_dim)
+            :param value: (batch_size, value_len, model_dim)
+            :param mask: (batch_size, query_len, key_len)
+            :param layer_cache:
+            :state DecoderState:
         """
-        # print('attention mask', mask)
         batch_size, query_len, d_model = query.size()
 
         d_head = d_model // self.heads_count
@@ -140,18 +140,21 @@ class MultiHeadedAttention(nn.Module):
         batch_size, key_len, d_model = key_projected.size()
         batch_size, value_len, d_model = value_projected.size()
 
-        query_heads = query_projected.view(batch_size, query_len, self.heads_count, d_head).transpose(1,
-                                                                                                      2)  # (batch_size, heads_count, query_len, d_head)
+        # (batch_size, heads_count, query_len, d_head)
+        query_heads = query_projected.view(batch_size, query_len, self.heads_count, d_head).transpose(1, 2)
+
         # print('query_heads', query_heads.shape)
         # print(batch_size, key_len, self.heads_count, d_head)
         # print(key_projected.shape)
-        key_heads = key_projected.view(batch_size, key_len, self.heads_count, d_head).transpose(1,
-                                                                                                2)  # (batch_size, heads_count, key_len, d_head)
-        value_heads = value_projected.view(batch_size, value_len, self.heads_count, d_head).transpose(1,
-                                                                                                      2)  # (batch_size, heads_count, value_len, d_head)
 
-        attention_weights = self.scaled_dot_product(query_heads,
-                                                    key_heads)  # (batch_size, heads_count, query_len, key_len)
+        # (batch_size, heads_count, key_len, d_head)
+        key_heads = key_projected.view(batch_size, key_len, self.heads_count, d_head).transpose(1, 2)
+
+        # (batch_size, heads_count, value_len, d_head)
+        value_heads = value_projected.view(batch_size, value_len, self.heads_count, d_head).transpose(1, 2)
+
+        # (batch_size, heads_count, query_len, key_len)
+        attention_weights = self.scaled_dot_product(query_heads, key_heads)
 
         if mask is not None:
             # print('mode', self.mode)
@@ -186,17 +189,29 @@ class MultiHeadedAttention(nn.Module):
 
 
 class PointwiseFeedForwardNetwork(nn.Module):
+    """
+    In addition to attention sub-layers, each of the layers in our encoder and decoder contains
+    a fully connected feed-forward network, which is applied to each position separately and
+    identically. This consists of two linear transformations with a ReLU activation in between.
 
+    While the linear transformations are the same across different positions, they use different
+    parameters from layer to layer. Another way of describing this is as two convolutions with kernel
+    size 1. The dimensionality of input and output is $d_{\text{model}}=512$, and the inner-layer
+    has dimensionality $d_{ff}=2048$.
+
+    Implements FFN equation.
+    """
     def __init__(self, d_ff, d_model, dropout_prob):
         super(PointwiseFeedForwardNetwork, self).__init__()
+        self.w_1 = nn.Linear(d_model, d_ff)
+        self.w_2 = nn.Linear(d_ff, d_model)
+        self.dropout = nn.Dropout(dropout_prob)
+        self.relu = nn.ReLU()
 
-        self.feed_forward = nn.Sequential(
-            nn.Linear(d_model, d_ff),
-            nn.Dropout(dropout_prob),
-            nn.ReLU(),
-            nn.Linear(d_ff, d_model),
-            nn.Dropout(dropout_prob),
-        )
+        self.feed_forward = nn.Sequential(self.w_1, self.dropout, self.relu, self.w_2, self.dropout)
+
+        # Solution 2: https://nlp.seas.harvard.edu/2018/04/03/attention.html
+        self.feed_forward_v2 = nn.Sequential(self.w_1, self.relu, self.dropout, self.w_2)
 
     def forward(self, x):
         """
