@@ -92,4 +92,3 @@ class IndexDictionary:
         instance.vocabulary_size = len(vocab_tokens)
 
         return instance
-
