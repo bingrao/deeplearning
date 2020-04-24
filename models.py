@@ -11,7 +11,9 @@ PAD_TOKEN_ID = 0
 
 
 def clones(module, N):
-    "Produce N identical layers."
+    """
+    Produce N identical layers.
+    """
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
 
@@ -20,18 +22,15 @@ class LayerNorm(nn.Module):
     Construct a layernorm module
     (See citation for details: https://arxiv.org/abs/1607.06450).
     """
-
-    def __init__(self, features_count, epsilon=1e-6):
+    def __init__(self, features, epsilon=1e-6):
         super(LayerNorm, self).__init__()
-
-        self.gain = nn.Parameter(torch.ones(features_count))
-        self.bias = nn.Parameter(torch.zeros(features_count))
+        self.gain = nn.Parameter(torch.ones(features))
+        self.bias = nn.Parameter(torch.zeros(features))
         self.epsilon = epsilon
 
     def forward(self, x):
         mean = x.mean(dim=-1, keepdim=True)
         std = x.std(dim=-1, keepdim=True)
-
         return self.gain * (x - mean) / (std + self.epsilon) + self.bias
 
 
@@ -41,14 +40,15 @@ class SublayerConnection(nn.Module):
     Note for code simplicity the norm is first as opposed to last.
     (See citation for details: https://arxiv.org/abs/1512.03385).
     """
-
     def __init__(self, size, dropout):
         super(SublayerConnection, self).__init__()
         self.norm = LayerNorm(size)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, sublayer):
-        "Apply residual connection to any sublayer with the same size."
+        """
+        Apply residual connection to any sublayer with the same size.
+        """
         return x + self.dropout(sublayer(self.norm(x)))
 
 
@@ -65,8 +65,9 @@ class Sublayer(nn.Module):
 
 
 class Generator(nn.Module):
-    "Define standard linear + softmax generation step."
-
+    """
+    Define standard linear + softmax generation step
+    """
     def __init__(self, embedding):
         super(Generator, self).__init__()
         self.proj = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
@@ -232,6 +233,9 @@ class PointwiseFeedForwardNetwork(nn.Module):
 
 
 class Encoder(nn.Module):
+    """
+    Core encoder is a stack of N layers
+    """
     def __init__(self, layer, N, d_model, embedding):
         super(Encoder, self).__init__()
         self.d_model = d_model
@@ -239,43 +243,39 @@ class Encoder(nn.Module):
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
 
-    def forward(self, sources, mask):
+    def forward(self, x, mask):
         """
         args:
-           sources: embedded_sequence, (batch_size, seq_len, embed_size)
+           x: embedded_sequence, (batch_size, seq_len, embed_size)
+        Pass the input (and mask) through each layer in turn.
         """
-        sources = self.embedding(sources)
+        x = self.embedding(x)
 
         for layer in self.layers:
-            sources = layer(sources, mask)
+            x = layer(x, mask)
 
-        return sources
+        return self.norm(x)
 
 
 class EncoderLayer(nn.Module):
-    "Encoder is made up of self-attn and feed forward (defined below)"
+    """
+    Encoder is made up of self-attn and feed forward (defined below)
+    """
 
     # def __init__(self, d_model, heads_count, d_ff, dropout_prob):
-    def __init__(self, d_model, self_attn, feed_forward, dropout):
+    def __init__(self, size, self_attn, feed_forward, dropout):
         super(EncoderLayer, self).__init__()
 
         self.self_attn = self_attn
         self.feed_forward = feed_forward
-        self.sublayer = clones(SublayerConnection(d_model, dropout), 2)
-        self.size = d_model
+        self.sublayer = clones(SublayerConnection(size, dropout), 2)
+        self.size = size
         self.dropout = nn.Dropout(dropout)
-
-        # self.self_attn = Sublayer(MultiHeadedAttention(heads_count, d_model, dropout_prob), d_model)
-        # self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
 
     def forward(self, x, mask):
         # x: (batch_size, seq_len, d_model)
-        # x = self.self_attn(x, x, x, mask)
-        # x = self.dropout(x)
-        # x = self.feed_forward(x)
-        # return x
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
-        x = self.dropout(x)
+        x = self.dropout(x)  # Optional
         return self.sublayer[1](x, self.feed_forward)
 
 
@@ -284,13 +284,8 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.d_model = d_model
         self.embedding = embedding
-
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
-
-        # self.layers = nn.ModuleList(
-        #     [DecoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
-        # )
 
         # Generator Solution 1
         self.generator = Generator(embedding)
@@ -304,6 +299,7 @@ class Decoder(nn.Module):
         # memory: (batch_size, seq_len, d_model)
 
         x = self.embedding(x)
+
         # if state is not None:
         #     x = torch.cat([state.previous_inputs, x], dim=1)
         #
@@ -342,7 +338,6 @@ class DecoderLayer(nn.Module):
     """
     Decoder is made of self-attn, src-attn, and feed forward
     """
-
     def __init__(self, d_model, self_attn, src_attn, feed_forward, dropout):
         super(DecoderLayer, self).__init__()
         self.size = d_model
@@ -350,26 +345,12 @@ class DecoderLayer(nn.Module):
         self.src_attn = src_attn
         self.feed_forward = feed_forward
         self.sublayer = clones(SublayerConnection(d_model, dropout), 3)
-        # self.self_attn = Sublayer(
-        #     MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='self-attention'), d_model)
-        # self.src_attn = Sublayer(
-        #     MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='memory-attention'), d_model)
-        # self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
 
     def forward(self, x, memory, src_mask, tgt_mask, layer_cache=None):
-        "Follow Figure 1 (right) for connections."
         m = memory
-        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask, layer_cache))
-        x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask, layer_cache))
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask))
+        x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
         return self.sublayer[2](x, self.feed_forward)
-        # print('self attention')
-        # print('inputs_mask', inputs_mask)
-        # x = self.self_attn(x, x, x, tgt_mask, layer_cache)
-        # print('memory attention')
-        # x = self.src_attn(x, memory, memory, src_mask, layer_cache)
-        # x = self.feed_forward(x)
-        # return x
-
 
 class DecoderState:
 
@@ -425,6 +406,15 @@ class Transformer(nn.Module):
 
 
 def build_model(config, source_vocabulary_size, target_vocabulary_size):
+    c = copy.deepcopy
+    d_model = config['d_model']
+    d_ff = config['d_ff']
+    dropout = config['dropout_prob']
+    N = config['layers_count']
+    h = config['heads_count']
+    attn = MultiHeadedAttention(h, d_model)
+    ff = PointwiseFeedForwardNetwork(d_ff, d_model, dropout)
+
     if config['positional_encoding']:
         source_embedding = PositionalEncoding(
             num_embeddings=source_vocabulary_size,
@@ -442,15 +432,6 @@ def build_model(config, source_vocabulary_size, target_vocabulary_size):
             num_embeddings=target_vocabulary_size,
             embedding_dim=config['d_model'])
 
-    c = copy.deepcopy
-    d_model = config['d_model']
-    d_ff = config['d_ff']
-    dropout = config['dropout_prob']
-    N = config['layers_count']
-    h = config['heads_count']  # heads_count
-    attn = MultiHeadedAttention(h, d_model)
-    ff = PointwiseFeedForwardNetwork(d_ff, d_model, dropout)
-
     encoder = Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout),  # encode layer
                       N,  # nums of layers in encode
                       d_model,  # Dim of vector
@@ -459,7 +440,7 @@ def build_model(config, source_vocabulary_size, target_vocabulary_size):
     decoder = Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout),
                       N,  # nums of layers in encode
                       d_model,  # Dim of vector
-                      embedding=target_embedding),
+                      embedding=target_embedding)
 
     model = Transformer(encoder,
                         decoder,
