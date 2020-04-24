@@ -5,11 +5,8 @@ import torch
 import torch.nn as nn
 import time
 from torch.autograd import Variable
-import seaborn
 from models import build_model
 from torchtext import data, datasets
-
-seaborn.set_context(context="talk")
 
 global max_src_in_batch, max_tgt_in_batch
 
@@ -390,7 +387,7 @@ def train_with_spacy_dataset():
         TGT.build_vocab(train.trg, min_freq=MIN_FREQ)
 
     # GPUs to use
-    devices = [0, 1, 2, 3]
+    devices = [0]
     if True:
         pad_idx = TGT.vocab.stoi["<blank>"]
         model = build_model(get_config(), len(SRC.vocab), len(TGT.vocab))
