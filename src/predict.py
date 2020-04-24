@@ -16,6 +16,8 @@ class Predictor:
         self.model = model
         self.max_length = max_length
         self.beam_size = beam_size
+        self.attentions = None
+        self.hypothesises = None
 
         self.model.eval()
         checkpoint = torch.load(checkpoint_filepath, map_location='cpu')
@@ -75,8 +77,6 @@ class Predictor:
 if __name__ == "__main__":
 
     config = get_config('Predict translation')
-
-
 
     print('Constructing dictionaries...')
     source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])

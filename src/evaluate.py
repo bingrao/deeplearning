@@ -1,12 +1,8 @@
-# from evaluator import Evaluator
 from predict import Predictor
 from models import build_model
 from datasets import TranslationDataset
 from datasets import IndexedInputTargetTranslationDataset
 from dictionaries import IndexDictionary
-
-from argparse import ArgumentParser
-import json
 from datetime import datetime
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 from tqdm import tqdm
@@ -20,7 +16,8 @@ class Evaluator:
         self.save_filepath = save_filepath
 
     def evaluate_dataset(self, test_dataset):
-        tokenize = lambda x: x.split()
+        def tokenize(x):
+            return x.split()
 
         predictions = []
         for source, target in tqdm(test_dataset):

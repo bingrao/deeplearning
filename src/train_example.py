@@ -5,12 +5,13 @@ from torch.autograd import Variable
 from models import build_model
 from torchtext import data, datasets
 from train import LabelSmoothing, Batch, run_epoch, MultiGPULossCompute
-from train import get_config, rebatch, MyIterator, greedy_decode
+from train import rebatch, MyIterator, greedy_decode
 from losses import SimpleLossCompute
 from optimizers import NoamOpt
 from utils.log import get_logger
-
+from argument import get_config
 global max_src_in_batch, max_tgt_in_batch
+
 logger = get_logger("train_example")
 
 
