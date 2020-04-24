@@ -17,9 +17,209 @@ from os.path import dirname, abspath, join, exists
 from os import makedirs
 from datetime import datetime
 import json
+import json
+from argparse import ArgumentParser
+import numpy as np
+import torch
+import torch.nn as nn
+import time
+from torch.autograd import Variable
+from models import build_model
+from torchtext import data, datasets
 
 PAD_INDEX = 0
 BASE_DIR = dirname(abspath(__file__))
+
+
+class LabelSmoothing(nn.Module):
+    "Implement label smoothing."
+
+    def __init__(self, size, padding_idx, smoothing=0.0):
+        super(LabelSmoothing, self).__init__()
+        self.criterion = nn.KLDivLoss(size_average=False)
+        self.padding_idx = padding_idx
+        self.confidence = 1.0 - smoothing
+        self.smoothing = smoothing
+        self.size = size
+        self.true_dist = None
+
+    def forward(self, x, target):
+        assert x.size(1) == self.size
+        true_dist = x.data.clone()
+        true_dist.fill_(self.smoothing / (self.size - 2))
+        true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
+        true_dist[:, self.padding_idx] = 0
+        mask = torch.nonzero(target.data == self.padding_idx)
+        if mask.dim() > 0:
+            true_dist.index_fill_(0, mask.squeeze(), 0.0)
+        self.true_dist = true_dist
+        return self.criterion(x, Variable(true_dist, requires_grad=False))
+
+
+class Batch:
+    """Object for holding a batch of data with mask during training."""
+
+    def __init__(self, src, trg=None, pad=0):
+        self.src = src
+        self.src_mask = (src != pad).unsqueeze(-2)
+        if trg is not None:
+            self.trg = trg[:, :-1]
+            self.trg_y = trg[:, 1:]
+            self.trg_mask = self.make_std_mask(self.trg, pad)
+            self.ntokens = (self.trg_y != pad).data.sum()
+
+    @staticmethod
+    def make_std_mask(tgt, pad):
+        "Create a mask to hide padding and future words."
+        tgt_mask = (tgt != pad).unsqueeze(-2)
+        tgt_mask = tgt_mask & Variable(
+            subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data))
+        return tgt_mask
+
+
+def run_epoch(data_iter, model, loss_compute):
+    """Standard Training and Logging Function"""
+    start = time.time()
+    total_tokens = 0
+    total_loss = 0
+    tokens = 0
+    for i, batch in enumerate(data_iter):
+        out = model.forward(batch.src, batch.trg,
+                            batch.src_mask, batch.trg_mask)
+        loss = loss_compute(out, batch.trg_y, batch.ntokens)
+        total_loss += loss
+        total_tokens += batch.ntokens
+        tokens += batch.ntokens
+        if i % 50 == 1:
+            elapsed = time.time() - start
+            print("Epoch Step: %d Loss: %f Tokens per Sec: %f" %
+                  (i, loss / batch.ntokens, tokens / elapsed))
+            start = time.time()
+            tokens = 0
+    return total_loss / total_tokens
+
+
+def subsequent_mask(size):
+    """Mask out subsequent positions."""
+    attn_shape = (1, size, size)
+    subs_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
+    return torch.from_numpy(subs_mask) == 0
+
+
+def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    memory = model.encode(src, src_mask)
+    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
+    for i in range(max_len - 1):
+        out = model.decode(memory, src_mask,
+                           Variable(ys),
+                           Variable(subsequent_mask(ys.size(1))
+                                    .type_as(src.data)))
+        prob = model.generator(out[:, -1])
+        _, next_word = torch.max(prob, dim=1)
+        next_word = next_word.data[0]
+        ys = torch.cat([ys,
+                        torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
+    return ys
+
+
+class MyIterator(data.Iterator):
+    def create_batches(self):
+        if self.train:
+            def pool(d, random_shuffler):
+                for p in data.batch(d, self.batch_size * 100):
+                    p_batch = data.batch(
+                        sorted(p, key=self.sort_key),
+                        self.batch_size, self.batch_size_fn)
+                    for b in random_shuffler(list(p_batch)):
+                        yield b
+
+            self.batches = pool(self.data(), self.random_shuffler)
+
+        else:
+            self.batches = []
+            for b in data.batch(self.data(), self.batch_size,
+                                self.batch_size_fn):
+                self.batches.append(sorted(b, key=self.sort_key))
+
+
+def rebatch(pad_idx, batch):
+    "Fix order in torchtext to match ours"
+    src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
+    return Batch(src, trg, pad_idx)
+
+
+# Finally to really target fast training, we will use multi-gpu.
+# This code implements multi-gpu word generation. It is not specific to
+# transformer so I won’t go into too much detail. The idea is to split up
+# word generation at training time into chunks to be processed in parallel
+# across many different gpus. We do this using pytorch parallel primitives:
+
+# replicate - split modules onto different gpus.
+# scatter - split batches onto different gpus
+# parallel_apply - apply module to batches on different gpus
+# gather - pull scattered data back onto one gpu.
+# nn.DataParallel - a special module wrapper that calls these all before evaluating.
+
+class MultiGPULossCompute:
+    """A multi-gpu loss compute and train function."""
+
+    def __init__(self, generator, criterion, devices, opt=None, chunk_size=5):
+        # Send out to different gpus.
+        self.generator = generator
+        self.criterion = nn.parallel.replicate(criterion, devices=devices)
+        self.opt = opt
+        self.devices = devices
+        self.chunk_size = chunk_size
+
+    def __call__(self, out, targets, normalize):
+        total = 0.0
+        generator = nn.parallel.replicate(self.generator,
+                                          devices=self.devices)
+        out_scatter = nn.parallel.scatter(out,
+                                          target_gpus=self.devices)
+        out_grad = [[] for _ in out_scatter]
+        targets = nn.parallel.scatter(targets,
+                                      target_gpus=self.devices)
+
+        # Divide generating into chunks.
+        chunk_size = self.chunk_size
+        for i in range(0, out_scatter[0].size(1), chunk_size):
+            # Predict distributions
+            out_column = [[Variable(o[:, i:i + chunk_size].data,
+                                    requires_grad=self.opt is not None)]
+                          for o in out_scatter]
+            gen = nn.parallel.parallel_apply(generator, out_column)
+
+            # Compute loss.
+            y = [(g.contiguous().view(-1, g.size(-1)),
+                  t[:, i:i + chunk_size].contiguous().view(-1))
+                 for g, t in zip(gen, targets)]
+            loss = nn.parallel.parallel_apply(self.criterion, y)
+
+            # Sum and normalize loss
+            l = nn.parallel.gather(loss,
+                                   target_device=self.devices[0])
+            l = l.sum()[0] / normalize
+            total += l.data[0]
+
+            # Backprop loss to output of transformer
+            if self.opt is not None:
+                l.backward()
+                for j, l in enumerate(loss):
+                    out_grad[j].append(out_column[j][0].grad.data.clone())
+
+        # Backprop all loss through transformer.
+        if self.opt is not None:
+            out_grad = [Variable(torch.cat(og, dim=1)) for og in out_grad]
+            o1 = out
+            o2 = nn.parallel.gather(out_grad,
+                                    target_device=self.devices[0])
+            o1.backward(gradient=o2)
+            self.opt.step()
+            self.opt.optimizer.zero_grad()
+        return total * normalize
+
+
 
 
 class TransformerTrainer:
@@ -196,7 +396,7 @@ class TransformerTrainer:
         return str(elapsed).split('.')[0]  # remove milliseconds
 
 
-def run_trainer(config):
+def run_trainer_standalone(config):
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
@@ -289,8 +489,7 @@ def run_trainer(config):
     return trainer
 
 
-if __name__ == '__main__':
-
+def get_config(desc='Train Transformer'):
     parser = ArgumentParser(description='Train Transformer')
     parser.add_argument('--config', type=str, default=None)
 
@@ -300,6 +499,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_log', type=str, default=None)
 
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
+    parser.add_argument('--gpu_idx', type=str, default=[0])
 
     parser.add_argument('--dataset_limit', type=int, default=None)
     parser.add_argument('--print_every', type=int, default=1)
@@ -308,10 +508,10 @@ if __name__ == '__main__':
     parser.add_argument('--vocabulary_size', type=int, default=None)
     parser.add_argument('--positional_encoding', action='store_true')
 
-    parser.add_argument('--d_model', type=int, default=32)
+    parser.add_argument('--d_model', type=int, default=16)
     parser.add_argument('--layers_count', type=int, default=6)
     parser.add_argument('--heads_count', type=int, default=8)
-    parser.add_argument('--d_ff', type=int, default=64)
+    parser.add_argument('--d_ff', type=int, default=32)
     parser.add_argument('--dropout_prob', type=float, default=0.1)
 
     parser.add_argument('--label_smoothing', type=float, default=0.1)
@@ -335,4 +535,4 @@ if __name__ == '__main__':
     else:
         config = vars(args)  # convert to dictionary
 
-    run_trainer(config)
+    return config

@@ -1,3 +1,5 @@
+spacy
+torchtext
 nltk
 tqdm
 torch

@@ -367,21 +367,21 @@ class Transformer(nn.Module):
         self.tgt_embed = tgt_embed
         self.generator = generator
 
-    def forward(self, sources, inputs):
-        # sources : (batch_size, sources_len)
-        # inputs : (batch_size, targets_len - 1)
-        batch_size, sources_len = sources.size()
-        batch_size, inputs_len = inputs.size()
+    def forward(self, src, tgt, src_mask=None, tgt_mask=None):
+        # src : (batch_size, src_len)
+        # tgt : (batch_size, targets_len - 1)
+        batch_size, src_len = src.size()
+        batch_size, tgt_len = tgt.size()
 
-        sources_mask = pad_masking(sources, sources_len)
-        memory_mask = pad_masking(sources, inputs_len)
-        inputs_mask = subsequent_masking(inputs) | pad_masking(inputs, inputs_len)
-
-        # (batch_size, seq_len, d_model)
-        memory = self.encoder(self.src_embed(sources), sources_mask)  # Context Vectors
+        src_mask = pad_masking(src, src_len)
+        memory_mask = pad_masking(src, tgt_len)
+        tgt_mask = subsequent_masking(tgt) | pad_masking(tgt, tgt_len)
 
         # (batch_size, seq_len, d_model)
-        outputs, state = self.decoder(self.tgt_embed(inputs), memory, memory_mask, inputs_mask)
+        memory = self.encoder(self.src_embed(src), src_mask)  # Context Vectors
+
+        # (batch_size, seq_len, d_model)
+        outputs, state = self.decoder(self.tgt_embed(tgt), memory, memory_mask, tgt_mask)
         return outputs
 
 
