@@ -198,6 +198,7 @@ class IndexedInputTargetTranslationDataset:
 
     def __init__(self, data_dir, phase, vocabulary_size=None, limit=None):
 
+        # [(indexed_sources, indexed_inputs, indexed_targets), (indexed_sources, indexed_inputs, indexed_targets)]
         self.data = []
 
         unknownify = lambda index: index if index < vocabulary_size else UNK_INDEX

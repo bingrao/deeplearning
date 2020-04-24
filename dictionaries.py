@@ -18,7 +18,6 @@ class IndexDictionary:
 
         # On-the-fly mode
         if iterable is not None:
-
             self.vocab_tokens, self.token_counts = self._build_vocabulary(iterable, vocabulary_size)
             self.token_index_dict = {token: index for index, token in enumerate(self.vocab_tokens)}
             self.vocabulary_size = len(self.vocab_tokens)
