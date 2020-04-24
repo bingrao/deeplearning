@@ -221,7 +221,7 @@ class Encoder(nn.Module):
     """
     Core encoder is a stack of N layers
     """
-    def __init__(self, layer, N, d_model):
+    def __init__(self, layer, N, d_model, src_vocab_size):
         super(Encoder, self).__init__()
         self.d_model = d_model
         self.layers = clones(layer, N)
@@ -262,18 +262,18 @@ class EncoderLayer(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, layer, N, d_model):
+    def __init__(self, layer, N, d_model, tgt_vocab_size):
         super(Decoder, self).__init__()
         self.d_model = d_model
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
 
         # Generator Solution 1
-        # self.generator = Generator(embedding)
+        self.generator = Generator(d_model, tgt_vocab_size)
 
         # Generator Solution 2
-        self.generator = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
-        self.generator.weight = self.embedding.weight
+        # self.generator = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
+        # self.generator.weight = self.embedding.weight
 
     def forward(self, x, memory, src_mask, tgt_mask=None, state=None):
         # x: (batch_size, seq_len - 1, d_model)
@@ -405,11 +405,13 @@ def build_model(config, src_vocab_size, tgt_vocab_size):
 
     encoder = Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout),  # encode layer
                       N,  # nums of layers in encode
-                      d_model)  # Dim of vector
+                      d_model,
+                      src_vocab_size)  # Dim of vector
 
     decoder = Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout),
                       N,  # nums of layers in encode
-                      d_model)  # Dim of vector
+                      d_model,
+                      tgt_vocab_size)  # Dim of vector
 
     model = Transformer(encoder,
                         decoder,
