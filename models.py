@@ -4,7 +4,7 @@ import numpy as np
 import math, copy, time
 import torch.nn.functional as F
 from collections import defaultdict
-from embeddings import PositionalEncoding
+from embeddings import PositionalEncoding, Embeddings
 from utils.pad import pad_masking, subsequent_masking
 
 PAD_TOKEN_ID = 0
@@ -52,26 +52,11 @@ class SublayerConnection(nn.Module):
         return x + self.dropout(sublayer(self.norm(x)))
 
 
-class Sublayer(nn.Module):
-    def __init__(self, sublayer, d_model):
-        super(Sublayer, self).__init__()
-        self.norm = LayerNorm(d_model)
-        self.sublayer = sublayer
-
-    def forward(self, *args):
-        x = args[0]
-        x = self.sublayer(*args) + x
-        return self.norm(x)
-
-
 class Generator(nn.Module):
-    """
-    Define standard linear + softmax generation step
-    """
-    def __init__(self, embedding):
+    """Define standard linear + softmax generation step."""
+    def __init__(self, d_model, vocab):
         super(Generator, self).__init__()
-        self.proj = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
-        self.weight = embedding.weight
+        self.proj = nn.Linear(d_model, vocab)
 
     def forward(self, x):
         return F.log_softmax(self.proj(x), dim=-1)
@@ -236,10 +221,9 @@ class Encoder(nn.Module):
     """
     Core encoder is a stack of N layers
     """
-    def __init__(self, layer, N, d_model, embedding):
+    def __init__(self, layer, N, d_model):
         super(Encoder, self).__init__()
         self.d_model = d_model
-        self.embedding = embedding
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
 
@@ -249,8 +233,6 @@ class Encoder(nn.Module):
            x: embedded_sequence, (batch_size, seq_len, embed_size)
         Pass the input (and mask) through each layer in turn.
         """
-        x = self.embedding(x)
-
         for layer in self.layers:
             x = layer(x, mask)
 
@@ -280,10 +262,9 @@ class EncoderLayer(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, layer, N, d_model, embedding):
+    def __init__(self, layer, N, d_model):
         super(Decoder, self).__init__()
         self.d_model = d_model
-        self.embedding = embedding
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
 
@@ -297,8 +278,6 @@ class Decoder(nn.Module):
     def forward(self, x, memory, src_mask, tgt_mask=None, state=None):
         # x: (batch_size, seq_len - 1, d_model)
         # memory: (batch_size, seq_len, d_model)
-
-        x = self.embedding(x)
 
         # if state is not None:
         #     x = torch.cat([state.previous_inputs, x], dim=1)
@@ -352,8 +331,8 @@ class DecoderLayer(nn.Module):
         x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
         return self.sublayer[2](x, self.feed_forward)
 
-class DecoderState:
 
+class DecoderState:
     def __init__(self):
         self.previous_inputs = torch.tensor([])
         self.layer_caches = defaultdict(lambda: {'self-attention': None, 'memory-attention': None})
@@ -361,7 +340,8 @@ class DecoderState:
     def update_state(self, layer_index, layer_mode, key_projected, value_projected):
         self.layer_caches[layer_index][layer_mode] = {
             'key_projected': key_projected,
-            'value_projected': value_projected}
+            'value_projected': value_projected
+        }
 
     # def repeat_beam_size_times(self, beam_size):
     #     self.
@@ -398,55 +378,44 @@ class Transformer(nn.Module):
         inputs_mask = subsequent_masking(inputs) | pad_masking(inputs, inputs_len)
 
         # (batch_size, seq_len, d_model)
-        memory = self.encoder(sources, sources_mask)  # Context Vectors
+        memory = self.encoder(self.src_embed(sources), sources_mask)  # Context Vectors
 
         # (batch_size, seq_len, d_model)
-        outputs, state = self.decoder(inputs, memory, memory_mask, inputs_mask)
+        outputs, state = self.decoder(self.tgt_embed(inputs), memory, memory_mask, inputs_mask)
         return outputs
 
 
-def build_model(config, source_vocabulary_size, target_vocabulary_size):
+# N=6,
+# d_model=512,
+# d_ff=2048,
+# h=8,
+# dropout=0.1
+def build_model(config, src_vocab_size, tgt_vocab_size):
     c = copy.deepcopy
+
+    N = config['layers_count']
     d_model = config['d_model']
     d_ff = config['d_ff']
-    dropout = config['dropout_prob']
-    N = config['layers_count']
     h = config['heads_count']
+    dropout = config['dropout_prob']
+
     attn = MultiHeadedAttention(h, d_model)
     ff = PointwiseFeedForwardNetwork(d_ff, d_model, dropout)
-
-    if config['positional_encoding']:
-        source_embedding = PositionalEncoding(
-            num_embeddings=source_vocabulary_size,
-            embedding_dim=config['d_model'],
-            dim=config['d_model'])  # why dim?
-        target_embedding = PositionalEncoding(
-            num_embeddings=target_vocabulary_size,
-            embedding_dim=config['d_model'],
-            dim=config['d_model'])  # why dim?
-    else:
-        source_embedding = nn.Embedding(
-            num_embeddings=source_vocabulary_size,
-            embedding_dim=config['d_model'])
-        target_embedding = nn.Embedding(
-            num_embeddings=target_vocabulary_size,
-            embedding_dim=config['d_model'])
+    position = PositionalEncoding(d_model, dropout)
 
     encoder = Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout),  # encode layer
                       N,  # nums of layers in encode
-                      d_model,  # Dim of vector
-                      embedding=source_embedding)
+                      d_model)  # Dim of vector
 
     decoder = Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout),
                       N,  # nums of layers in encode
-                      d_model,  # Dim of vector
-                      embedding=target_embedding)
+                      d_model)  # Dim of vector
 
     model = Transformer(encoder,
                         decoder,
-                        source_embedding,
-                        target_embedding,
-                        Generator(target_embedding))
+                        nn.Sequential(Embeddings(d_model, src_vocab_size), c(position)),
+                        nn.Sequential(Embeddings(d_model, tgt_vocab_size), c(position)),
+                        Generator(d_model, tgt_vocab_size))
 
     # This was important from their code.
     # Initialize parameters with Glorot / fan_avg.
