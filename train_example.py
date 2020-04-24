@@ -292,13 +292,12 @@ def train_simple_with_dummy_data(V=11):
 # nn.DataParallel - a special module wrapper that calls these all before evaluating.
 
 class MultiGPULossCompute:
-    "A multi-gpu loss compute and train function."
+    """A multi-gpu loss compute and train function."""
 
     def __init__(self, generator, criterion, devices, opt=None, chunk_size=5):
         # Send out to different gpus.
         self.generator = generator
-        self.criterion = nn.parallel.replicate(criterion,
-                                               devices=devices)
+        self.criterion = nn.parallel.replicate(criterion, devices=devices)
         self.opt = opt
         self.devices = devices
         self.chunk_size = chunk_size
@@ -387,7 +386,7 @@ def train_with_spacy_dataset():
         TGT.build_vocab(train.trg, min_freq=MIN_FREQ)
 
     # GPUs to use
-    devices = [0]
+    devices = [0, 1, 2, 3]
     if True:
         pad_idx = TGT.vocab.stoi["<blank>"]
         model = build_model(get_config(), len(SRC.vocab), len(TGT.vocab))
@@ -407,19 +406,17 @@ def train_with_spacy_dataset():
     # !wget https://s3.amazonaws.com/opennmt-models/iwslt.pt
 
     if True:
-        # model_opt = NoamOpt(model.src_embed[0].d_model, 1, 2000,
-        #                     torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+        model_opt = NoamOpt(model.src_embed[0].d_model, 1, 2000,
+                            torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
         for epoch in range(10):
             model_par.train()
             run_epoch((rebatch(pad_idx, b) for b in train_iter),
                       model_par,
-                      MultiGPULossCompute(model.generator, criterion,
-                                          devices=devices))
+                      MultiGPULossCompute(model.generator, criterion, devices=devices))
             model_par.eval()
             loss = run_epoch((rebatch(pad_idx, b) for b in valid_iter),
                              model_par,
-                             MultiGPULossCompute(model.generator, criterion,
-                                                 devices=devices, opt=None))
+                             MultiGPULossCompute(model.generator, criterion, devices=devices, opt=None))
             print(loss)
     else:
         model = torch.load("iwslt.pt")
