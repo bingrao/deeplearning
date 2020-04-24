@@ -13,7 +13,6 @@ import random
 import torch
 import numpy as np
 from tqdm import tqdm
-
 from os.path import dirname, abspath, join, exists
 from os import makedirs
 from datetime import datetime
@@ -309,10 +308,10 @@ if __name__ == '__main__':
     parser.add_argument('--vocabulary_size', type=int, default=None)
     parser.add_argument('--positional_encoding', action='store_true')
 
-    parser.add_argument('--d_model', type=int, default=128)
-    parser.add_argument('--layers_count', type=int, default=1)
-    parser.add_argument('--heads_count', type=int, default=2)
-    parser.add_argument('--d_ff', type=int, default=128)
+    parser.add_argument('--d_model', type=int, default=256)
+    parser.add_argument('--layers_count', type=int, default=6)
+    parser.add_argument('--heads_count', type=int, default=8)
+    parser.add_argument('--d_ff', type=int, default=1024)
     parser.add_argument('--dropout_prob', type=float, default=0.1)
 
     parser.add_argument('--label_smoothing', type=float, default=0.1)
@@ -321,7 +320,7 @@ if __name__ == '__main__':
     parser.add_argument('--clip_grads', action='store_true')
 
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=1000)
 
     args = parser.parse_args()
 
