@@ -407,14 +407,14 @@ def train_with_spacy_dataset():
     # !wget https://s3.amazonaws.com/opennmt-models/iwslt.pt
 
     if True:
-        model_opt = NoamOpt(model.src_embed[0].d_model, 1, 2000,
-                            torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+        # model_opt = NoamOpt(model.src_embed[0].d_model, 1, 2000,
+        #                     torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
         for epoch in range(10):
             model_par.train()
             run_epoch((rebatch(pad_idx, b) for b in train_iter),
                       model_par,
                       MultiGPULossCompute(model.generator, criterion,
-                                          devices=devices, opt=model_opt))
+                                          devices=devices))
             model_par.eval()
             loss = run_epoch((rebatch(pad_idx, b) for b in valid_iter),
                              model_par,
