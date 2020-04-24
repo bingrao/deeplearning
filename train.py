@@ -17,7 +17,6 @@ from os.path import dirname, abspath, join, exists
 from os import makedirs
 from datetime import datetime
 import json
-from argument import get_config
 
 PAD_INDEX = 0
 BASE_DIR = dirname(abspath(__file__))
@@ -291,4 +290,49 @@ def run_trainer(config):
 
 
 if __name__ == '__main__':
-    run_trainer(get_config('Train Transformer'))
+
+    parser = ArgumentParser(description='Train Transformer')
+    parser.add_argument('--config', type=str, default=None)
+
+    parser.add_argument('--data_dir', type=str, default='data/example/processed')
+    parser.add_argument('--save_config', type=str, default=None)
+    parser.add_argument('--save_checkpoint', type=str, default=None)
+    parser.add_argument('--save_log', type=str, default=None)
+
+    parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
+
+    parser.add_argument('--dataset_limit', type=int, default=None)
+    parser.add_argument('--print_every', type=int, default=1)
+    parser.add_argument('--save_every', type=int, default=1)
+
+    parser.add_argument('--vocabulary_size', type=int, default=None)
+    parser.add_argument('--positional_encoding', action='store_true')
+
+    parser.add_argument('--d_model', type=int, default=32)
+    parser.add_argument('--layers_count', type=int, default=6)
+    parser.add_argument('--heads_count', type=int, default=8)
+    parser.add_argument('--d_ff', type=int, default=64)
+    parser.add_argument('--dropout_prob', type=float, default=0.1)
+
+    parser.add_argument('--label_smoothing', type=float, default=0.1)
+    parser.add_argument('--optimizer', type=str, default="Adam", choices=["Noam", "Adam"])
+    parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--clip_grads', action='store_true')
+
+    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--epochs', type=int, default=100)
+
+    args = parser.parse_args()
+
+    if args.config is not None:
+        with open(args.config) as f:
+            config = json.load(f)
+
+        default_config = vars(args)
+        for key, default_value in default_config.items():
+            if key not in config:
+                config[key] = default_value
+    else:
+        config = vars(args)  # convert to dictionary
+
+    run_trainer(config)

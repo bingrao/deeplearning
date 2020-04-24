@@ -10,7 +10,6 @@ import json
 from datetime import datetime
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 from tqdm import tqdm
-from argument import get_config
 
 
 class Evaluator:
@@ -51,7 +50,15 @@ class Evaluator:
 
 if __name__ == "__main__":
 
-    config = get_config('Predict translation')
+    parser = ArgumentParser(description='Predict translation')
+    parser.add_argument('--save_result', type=str, default='logs/example_eval.txt')
+    parser.add_argument('--config', type=str, required=True, default='checkpoints/example_config.json')
+    parser.add_argument('--checkpoint', type=str, required=True, default='checkpoints/example_model.pth')
+    parser.add_argument('--phase', type=str, default='val', choices=['train', 'val'])
+
+    args = parser.parse_args()
+    with open(args.config) as f:
+        config = json.load(f)
 
     print('Constructing dictionaries...')
     source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
@@ -64,16 +71,16 @@ if __name__ == "__main__":
         preprocess=IndexedInputTargetTranslationDataset.preprocess(source_dictionary),
         postprocess=lambda x: ' '.join([token for token in target_dictionary.tokenify_indexes(x) if token != '<EndSent>']),
         model=model,
-        checkpoint_filepath=config["checkpoint"]
+        checkpoint_filepath=args.checkpoint
     )
 
     timestamp = datetime.now()
-    if config["save_result"] is None:
+    if args.save_result is None:
         eval_filepath = 'logs/eval-{config}-time={timestamp}.csv'.format(
-            config=config["eval_config"].replace('/', '-'),
+            config=args.config.replace('/', '-'),
             timestamp=timestamp.strftime("%Y_%m_%d_%H_%M_%S"))
     else:
-        eval_filepath = config["save_result"]
+        eval_filepath = args.save_result
 
     evaluator = Evaluator(
         predictor=predictor,
@@ -81,7 +88,7 @@ if __name__ == "__main__":
     )
 
     print('Evaluating...')
-    test_dataset = TranslationDataset(config['data_dir'], config["phase"], limit=1000)
+    test_dataset = TranslationDataset(config['data_dir'], args.phase, limit=1000)
     bleu_score = evaluator.evaluate_dataset(test_dataset)
     print('Evaluation time :', datetime.now() - timestamp)
 
