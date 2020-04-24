@@ -14,22 +14,20 @@ from os.path import dirname, abspath, join, exists
 from os import makedirs
 from datetime import datetime
 import json
-from argparse import ArgumentParser
 import numpy as np
 import torch
 import torch.nn as nn
 import time
 from torch.autograd import Variable
 from models import build_model
-# from torchtext import data
+from torchtext import data
 
 PAD_INDEX = 0
 BASE_DIR = dirname(abspath(__file__))
 
 
 class LabelSmoothing(nn.Module):
-    "Implement label smoothing."
-
+    """Implement label smoothing."""
     def __init__(self, size, padding_idx, smoothing=0.0):
         super(LabelSmoothing, self).__init__()
         self.criterion = nn.KLDivLoss(size_average=False)
@@ -427,17 +425,9 @@ def run_trainer_standalone(config):
     logger.info('Total : {parameters_count} parameters'.format(parameters_count=sum([p.nelement() for p in model.parameters()])))
 
     logger.info('Loading datasets...')
-    train_dataset = IndexedInputTargetTranslationDataset(
-        data_dir=config['data_dir'],
-        phase='train',
-        vocabulary_size=config['vocabulary_size'],
-        limit=config['dataset_limit'])
+    train_dataset = IndexedInputTargetTranslationDataset(config=config, phase='train')
 
-    val_dataset = IndexedInputTargetTranslationDataset(
-        data_dir=config['data_dir'],
-        phase='val',
-        vocabulary_size=config['vocabulary_size'],
-        limit=config['dataset_limit'])
+    val_dataset = IndexedInputTargetTranslationDataset(config=config, phase='val')
 
     train_dataloader = DataLoader(
         train_dataset,
@@ -483,52 +473,3 @@ def run_trainer_standalone(config):
     trainer.run(config['epochs'])
 
     return trainer
-
-
-def get_config(desc='Train Transformer'):
-    parser = ArgumentParser(description='Train Transformer')
-    parser.add_argument('--config', type=str, default=None)
-
-    parser.add_argument('--data_dir', type=str, default='data/example/processed')
-    parser.add_argument('--save_config', type=str, default=None)
-    parser.add_argument('--save_checkpoint', type=str, default=None)
-    parser.add_argument('--save_log', type=str, default=None)
-
-    parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
-    parser.add_argument('--gpu_idx', type=str, default=[0])
-
-    parser.add_argument('--dataset_limit', type=int, default=None)
-    parser.add_argument('--print_every', type=int, default=1)
-    parser.add_argument('--save_every', type=int, default=1)
-
-    parser.add_argument('--vocabulary_size', type=int, default=None)
-    parser.add_argument('--positional_encoding', action='store_true')
-
-    parser.add_argument('--d_model', type=int, default=16)
-    parser.add_argument('--layers_count', type=int, default=6)
-    parser.add_argument('--heads_count', type=int, default=8)
-    parser.add_argument('--d_ff', type=int, default=32)
-    parser.add_argument('--dropout_prob', type=float, default=0.1)
-
-    parser.add_argument('--label_smoothing', type=float, default=0.1)
-    parser.add_argument('--optimizer', type=str, default="Adam", choices=["Noam", "Adam"])
-    parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--clip_grads', action='store_true')
-
-    parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--epochs', type=int, default=100)
-
-    args = parser.parse_args()
-
-    if args.config is not None:
-        with open(args.config) as f:
-            config = json.load(f)
-
-        default_config = vars(args)
-        for key, default_value in default_config.items():
-            if key not in config:
-                config[key] = default_value
-    else:
-        config = vars(args)  # convert to dictionary
-
-    return config

@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 from dictionaries import START_TOKEN, END_TOKEN
 from utils.log import get_logger
 import logging
+from argument import get_config
 
 UNK_INDEX = 1
 
@@ -21,19 +22,19 @@ class TranslationDataset:
         self.limit = limit
         self.config = config
         self.phase = phase
-        self.raw_data_path = join(config.save_data_dir, f'raw-{phase}.txt')
+        self.raw_data_path = join(config["save_data_dir"], f'raw-{phase}.txt')
         self.data = []
 
-        if not exists(config.save_data_dir):
-            makedirs(config.save_data_dir)
+        if not exists(config["save_data_dir"]):
+            makedirs(config["save_data_dir"])
 
         if not exists(self.raw_data_path):
             if phase == 'train':
-                source_filepath = config.train_source
-                target_filepath = config.train_target
+                source_filepath = config["train_source"]
+                target_filepath = config["train_target"]
             elif phase == 'val':
-                source_filepath = config.val_source
-                target_filepath = config.val_target
+                source_filepath = config["val_source"]
+                target_filepath = config["val_target"]
             else:
                 raise NotImplementedError()
 
@@ -50,7 +51,7 @@ class TranslationDataset:
                     line = f'{source_line}\t{target_line}\n'
                     file.write(line)
 
-        with open(join(config.save_data_dir, f'raw-{phase}.txt')) as file:
+        with open(join(config["save_data_dir"], f'raw-{phase}.txt')) as file:
             for line in file:
                 source, target = line.strip().split('\t')
                 self.data.append((source, target))
@@ -73,17 +74,17 @@ class TranslationDataset:
         1.  Combine train source and target into a single file
         2.  Combine validate source and target into a single file
         """
-        if not exists(config.save_data_dir):
-            makedirs(config.save_data_dir)
+        if not exists(config["save_data_dir"]):
+            makedirs(config["save_data_dir"])
 
         for phase in ('train', 'val'):
 
             if phase == 'train':
-                source_filepath = config.train_source
-                target_filepath = config.train_target
+                source_filepath = config["train_source"]
+                target_filepath = config["train_target"]
             else:
-                source_filepath = config.val_source
-                target_filepath = config.val_target
+                source_filepath = config["val_source"]
+                target_filepath = config["val_target"]
 
             with open(source_filepath) as source_file:
                 source_data = source_file.readlines()
@@ -91,7 +92,7 @@ class TranslationDataset:
             with open(target_filepath) as target_filepath:
                 target_data = target_filepath.readlines()
 
-            with open(join(config.save_data_dir, f'raw-{phase}.txt'), 'w') as file:
+            with open(join(config["save_data_dir"], f'raw-{phase}.txt'), 'w') as file:
                 for source_line, target_line in zip(source_data, target_data):
                     source_line = source_line.strip()
                     target_line = target_line.strip()
@@ -111,11 +112,11 @@ class TranslationDatasetOnTheFly:
         self.limit = limit
 
         if phase == 'train':
-            source_filepath = config.train_source
-            target_filepath = config.train_target
+            source_filepath = config["train_source"]
+            target_filepath = config["train_target"]
         elif phase == 'val':
-            source_filepath = config.val_source
-            target_filepath = config.val_target
+            source_filepath = config["val_source"]
+            target_filepath = config["val_target"]
         else:
             raise NotImplementedError()
 
@@ -274,18 +275,41 @@ class IndexedInputTargetTranslationDatasetOnTheFly:
 
 
 class IndexedInputTargetTranslationDataset:
-    def __init__(self, config, phase, vocabulary_size=None, limit=None):
+    def __init__(self, config, phase):
 
         # [(indexed_sources, indexed_inputs, indexed_targets), (indexed_sources, indexed_inputs, indexed_targets)]
         self.data = []
+        self.config = config
+        self.phase = phase
+        self.index_path = join(config["save_data_dir"], f'indexed-{phase}.txt')
+        self.vocabulary_size = config["vocabulary_size"]
+        self.limit = config["dataset_limit"]
+
+        if not exists(self.index_path):
+            # source vocabulary dictionary
+            src_dictionary = IndexDictionary.load(config["save_data_dir"], mode='source')
+
+            # target vocabulary dictionary
+            tgt_dictionary = IndexDictionary.load(config["save_data_dir"], mode='target')
+
+            def join_indexes(indexes):
+                return ' '.join(str(index) for index in indexes)
+
+            input_target_dataset = InputTargetTranslationDataset(config, phase)
+            with open(self.index_path, 'w') as file:
+                for sources, inputs, targets in input_target_dataset:
+                    indexed_sources = join_indexes(src_dictionary.index_sentence(sources))
+                    indexed_inputs = join_indexes(tgt_dictionary.index_sentence(inputs))
+                    indexed_targets = join_indexes(tgt_dictionary.index_sentence(targets))
+                    file.write(f'{indexed_sources}\t{indexed_inputs}\t{indexed_targets}\n')
 
         def unknownify(index):
-            return index if index < vocabulary_size else UNK_INDEX
+            return index if index < self.vocabulary_size else UNK_INDEX
         # unknownify = lambda index: index if index < vocabulary_size else UNK_INDEX
-        with open(join(config.save_data_dir, f'indexed-{phase}.txt')) as file:
+        with open(self.index_path) as file:
             for line in file:
                 sources, inputs, targets = line.strip().split('\t')
-                if vocabulary_size is not None:
+                if self.vocabulary_size is not None:
                     indexed_sources = [unknownify(int(index)) for index in sources.strip().split(' ')]
                     indexed_inputs = [unknownify(int(index)) for index in inputs.strip().split(' ')]
                     indexed_targets = [unknownify(int(index)) for index in targets.strip().split(' ')]
@@ -294,11 +318,8 @@ class IndexedInputTargetTranslationDataset:
                     indexed_inputs = [int(index) for index in inputs.strip().split(' ')]
                     indexed_targets = [int(index) for index in targets.strip().split(' ')]
                 self.data.append((indexed_sources, indexed_inputs, indexed_targets))
-                if limit is not None and len(self.data) >= limit:
+                if self.limit is not None and len(self.data) >= self.limit:
                     break
-
-        self.vocabulary_size = vocabulary_size
-        self.limit = limit
 
     def __getitem__(self, item):
         if self.limit is not None and item >= self.limit:
@@ -324,21 +345,28 @@ class IndexedInputTargetTranslationDataset:
         return preprocess_function
 
     @staticmethod
-    def prepare(config, src_dictionary, tgt_dictionary):
+    def prepare(config, src_dictionary=None, tgt_dictionary=None):
         """
-
         :param config:
         :param src_dictionary: source vocabulary dictionary
         :param tgt_dictionary: target vocabulary dictionary
         :return:
         """
+        if src_dictionary is None:
+            # source vocabulary dictionary
+            src_dictionary = IndexDictionary.load(config["save_data_dir"], mode='source')
+
+        if tgt_dictionary is None:
+            # target vocabulary dictionary
+            tgt_dictionary = IndexDictionary.load(config["save_data_dir"], mode='target')
+
         def join_indexes(indexes):
             return ' '.join(str(index) for index in indexes)
-        # join_indexes = lambda indexes: ' '.join(str(index) for index in indexes)
+
         for phase in ('train', 'val'):
             input_target_dataset = InputTargetTranslationDataset(config, phase)
 
-            with open(join(config.save_data_dir, f'indexed-{phase}.txt'), 'w') as file:
+            with open(join(config["save_data_dir"], f'indexed-{phase}.txt'), 'w') as file:
                 for sources, inputs, targets in input_target_dataset:
                     indexed_sources = join_indexes(src_dictionary.index_sentence(sources))
                     indexed_inputs = join_indexes(tgt_dictionary.index_sentence(inputs))
@@ -347,32 +375,25 @@ class IndexedInputTargetTranslationDataset:
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser('Prepare datasets')
-    parser.add_argument('--train_source', type=str, default=None)
-    parser.add_argument('--train_target', type=str, default=None)
-    parser.add_argument('--val_source', type=str, default=None)
-    parser.add_argument('--val_target', type=str, default=None)
-    parser.add_argument('--save_data_dir', type=str, default=None)
-    parser.add_argument('--share_dictionary', type=bool, default=False)
-    args = parser.parse_args()
+    config = get_config('Prepare datasets')
     logger = get_logger("[Prepare_Dataset]-")
+    logger.info(config)
 
-    logger.info(args)
-
-    # Preparing Raw train/val dataset: a file of each line (src, tgt)
-    # src-train.txt + tgt-train.txt --> raw-train.txt
-    # src-val.txt + tgt-val.txt --> raw-val.txt
-    # logger.info("The raw train and validate datasets are generating ...")
-    # TranslationDataset.prepare(args)
+    if logger.isEnabledFor(logging.DEBUG):
+        # Preparing Raw train/val dataset: a file of each line (src, tgt)
+        # src-train.txt + tgt-train.txt --> raw-train.txt
+        # src-val.txt + tgt-val.txt --> raw-val.txt
+        logger.debug("The raw train and validate datasets are generating ...")
+        TranslationDataset.prepare(config)
 
     # a list of train dataset: [(src, tgt), ..., (src, tgt)], build from raw-train.txt
     logger.info("The train dataset [(src, tgt), ..., (src, tgt)] is generating ...")
-    translation_dataset = TranslationDataset(args, 'train')
+    translation_dataset = TranslationDataset(config, 'train')
 
     if logger.isEnabledFor(logging.DEBUG):
         # a list of train dataset: [(src, tgt), ..., (src, tgt)], build from src-train.txt, tgt-train.txt
         logger.debug("The train dataset [(src, tgt), ..., (src, tgt)] is generating on the fly ...")
-        translation_dataset_on_the_fly = TranslationDatasetOnTheFly(args, 'train')
+        translation_dataset_on_the_fly = TranslationDatasetOnTheFly(config, 'train')
 
         # These datasets should be equal in content
         assert translation_dataset[0] == translation_dataset_on_the_fly[0]
@@ -380,46 +401,46 @@ if __name__ == "__main__":
     # a list of train token datasets: [([src_token], [tgt_token]), ..., ([src_token], [tgt_token])]
     # Build it from raw-train.txt
     logger.info("The tokenize train dataset [([token], [token]), ..., ([token], [token])] is generating ...")
-    tokenized_dataset = TokenizedTranslationDataset(args, 'train')
+    tokenized_dataset = TokenizedTranslationDataset(config, 'train')
 
     logger.info("The source and target vocabulary dictionaries are generating and saving ...")
-    if args.share_dictionary:
-
+    if config["share_dictionary"]:
         source_generator = shared_tokens_generator(tokenized_dataset)
         source_dictionary = IndexDictionary(source_generator, mode='source')
         # Save source vocabulary
-        source_dictionary.save(args.save_data_dir)
+        source_dictionary.save(config["save_data_dir"])
 
         target_generator = shared_tokens_generator(tokenized_dataset)
         target_dictionary = IndexDictionary(target_generator, mode='target')
         # Save target vocabulary
-        target_dictionary.save(args.save_data_dir)
+        target_dictionary.save(config["save_data_dir"])
     else:
         source_generator = source_tokens_generator(tokenized_dataset)
         source_dictionary = IndexDictionary(source_generator, mode='source')
         # Save source vocabulary
-        source_dictionary.save(args.save_data_dir)
+        source_dictionary.save(config["save_data_dir"])
 
         target_generator = target_tokens_generator(tokenized_dataset)
         target_dictionary = IndexDictionary(target_generator, mode='target')
         # Save target vocabulary
-        target_dictionary.save(args.save_data_dir)
+        target_dictionary.save(config["save_data_dir"])
 
     if logger.isEnabledFor(logging.DEBUG):
         # source vocabulary dictionary
         logger.debug("Loading Source Dictionary from vocabulary-source.txt")
-        source_dictionary = IndexDictionary.load(args.save_data_dir, mode='source')
+        source_dictionary = IndexDictionary.load(config["save_data_dir"], mode='source')
 
         # target vocabulary dictionary
         logger.debug("Loading Target Dictionary from vocabulary-target.txt")
-        target_dictionary = IndexDictionary.load(args.save_data_dir, mode='target')
-
-    logger.info("Convert tokens into index for train/validate datasets ...")
-    IndexedInputTargetTranslationDataset.prepare(args, source_dictionary, target_dictionary)
+        target_dictionary = IndexDictionary.load(config["save_data_dir"], mode='target')
 
     if logger.isEnabledFor(logging.DEBUG):
-        indexed_translation_dataset = IndexedInputTargetTranslationDataset(args, 'train')
-        indexed_translation_dataset_on_the_fly = IndexedInputTargetTranslationDatasetOnTheFly(args,
+        logger.info("Convert tokens into index for train/validate datasets ...")
+        IndexedInputTargetTranslationDataset.prepare(config, source_dictionary, target_dictionary)
+
+    indexed_translation_dataset = IndexedInputTargetTranslationDataset(config, 'train')
+    if logger.isEnabledFor(logging.DEBUG):
+        indexed_translation_dataset_on_the_fly = IndexedInputTargetTranslationDatasetOnTheFly(config,
                                                                                               'train',
                                                                                               source_dictionary,
                                                                                               target_dictionary)

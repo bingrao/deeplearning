@@ -1,14 +1,11 @@
-# from predictors import Predictor
 from models import build_model
 from datasets import IndexedInputTargetTranslationDataset
 from dictionaries import IndexDictionary
 
-from argparse import ArgumentParser
-import json
-
 from beam import Beam
 from utils.pad import pad_masking
 import torch
+from argument import get_config
 
 
 class Predictor:
@@ -76,15 +73,10 @@ class Predictor:
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description='Predict translation')
-    parser.add_argument('--source', type=str)
-    parser.add_argument('--config', type=str, required=True, default='checkpoints/example_config.json')
-    parser.add_argument('--checkpoint', type=str, default='checkpoints/example_model.pth')
-    parser.add_argument('--num_candidates', type=int, default=3)
 
-    args = parser.parse_args()
-    with open(args.config) as f:
-        config = json.load(f)
+    config = get_config('Predict translation')
+
+
 
     print('Constructing dictionaries...')
     source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
@@ -97,8 +89,8 @@ if __name__ == "__main__":
         preprocess=IndexedInputTargetTranslationDataset.preprocess(source_dictionary),
         postprocess=lambda x: ' '.join([token for token in target_dictionary.tokenify_indexes(x) if token != '<EndSent>']),
         model=model,
-        checkpoint_filepath=args.checkpoint
+        checkpoint_filepath=config["checkpoint"]
     )
 
-    for index, candidate in enumerate(predictor.predict_one(args.source, num_candidates=args.num_candidates)):
+    for index, candidate in enumerate(predictor.predict_one(config["source"], num_candidates=config["num_candidates"])):
         print(f'Candidate {index} : {candidate}')
