@@ -404,14 +404,14 @@ def build_model(config, src_vocab_size, tgt_vocab_size):
     position = PositionalEncoding(d_model, dropout)
 
     encoder = Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout),  # encode layer
-                      N,  # nums of layers in encode
-                      d_model,
-                      src_vocab_size)  # Dim of vector
+                      N,  # nums of layers in encoder
+                      d_model,  # Dim of vector
+                      src_vocab_size)
 
-    decoder = Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout),
-                      N,  # nums of layers in encode
-                      d_model,
-                      tgt_vocab_size)  # Dim of vector
+    decoder = Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout),  # decode layer
+                      N,  # nums of layers in decoder
+                      d_model,  # Dim of vector
+                      tgt_vocab_size)
 
     model = Transformer(encoder,
                         decoder,

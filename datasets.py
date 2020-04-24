@@ -2,8 +2,8 @@ from os.path import dirname, abspath, join, exists
 from os import makedirs
 from dictionaries import IndexDictionary
 from utils.pipe import shared_tokens_generator, source_tokens_generator, target_tokens_generator
-from argparse import ArgumentParser
 from dictionaries import START_TOKEN, END_TOKEN
+from argument import get_config
 UNK_INDEX = 1
 
 BASE_DIR = dirname(abspath(__file__))
@@ -201,7 +201,9 @@ class IndexedInputTargetTranslationDataset:
         # [(indexed_sources, indexed_inputs, indexed_targets), (indexed_sources, indexed_inputs, indexed_targets)]
         self.data = []
 
-        unknownify = lambda index: index if index < vocabulary_size else UNK_INDEX
+        def unknownify(index):
+            return index if index < vocabulary_size else UNK_INDEX
+        # unknownify = lambda index: index if index < vocabulary_size else UNK_INDEX
         with open(join(data_dir, f'indexed-{phase}.txt')) as file:
             for line in file:
                 sources, inputs, targets = line.strip().split('\t')
@@ -245,8 +247,9 @@ class IndexedInputTargetTranslationDataset:
 
     @staticmethod
     def prepare(data_dir, source_dictionary, target_dictionary):
-
-        join_indexes = lambda indexes: ' '.join(str(index) for index in indexes)
+        def join_indexes(indexes):
+            return ' '.join(str(index) for index in indexes)
+        # join_indexes = lambda indexes: ' '.join(str(index) for index in indexes)
         for phase in ('train', 'val'):
             input_target_dataset = InputTargetTranslationDataset(data_dir, phase)
 
@@ -259,46 +262,48 @@ class IndexedInputTargetTranslationDataset:
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser('Prepare datasets')
-    parser.add_argument('--train_source', type=str, default='data/example/raw/src-train.txt')
-    parser.add_argument('--train_target', type=str, default='data/example/raw/tgt-train.txt')
-    parser.add_argument('--val_source', type=str, default='data/example/raw/src-val.txt')
-    parser.add_argument('--val_target', type=str, default='data/example/raw/tgt-val.txt')
-    parser.add_argument('--save_data_dir', type=str, default='data/example/processed')
-    parser.add_argument('--share_dictionary', type=bool, default=False)
 
-    args = parser.parse_args()
+    config = get_config('Prepare datasets')
 
-    TranslationDataset.prepare(args.train_source, args.train_target, args.val_source, args.val_target, args.save_data_dir)
-    translation_dataset = TranslationDataset(args.save_data_dir, 'train')
+    TranslationDataset.prepare(config["train_source"],
+                               config["train_target"],
+                               config["val_source"],
+                               config["val_target"],
+                               config["save_data_dir"])
+    translation_dataset = TranslationDataset(config["save_data_dir"], 'train')
     translation_dataset_on_the_fly = TranslationDatasetOnTheFly('train')
     assert translation_dataset[0] == translation_dataset_on_the_fly[0]
 
-    tokenized_dataset = TokenizedTranslationDataset(args.save_data_dir, 'train')
+    tokenized_dataset = TokenizedTranslationDataset(config["save_data_dir"], 'train')
 
-    if args.share_dictionary:
+    if config["share_dictionary"]:
         source_generator = shared_tokens_generator(tokenized_dataset)
         source_dictionary = IndexDictionary(source_generator, mode='source')
         target_generator = shared_tokens_generator(tokenized_dataset)
         target_dictionary = IndexDictionary(target_generator, mode='target')
 
-        source_dictionary.save(args.save_data_dir)
-        target_dictionary.save(args.save_data_dir)
+        source_dictionary.save(config["save_data_dir"])
+        target_dictionary.save(config["save_data_dir"])
     else:
         source_generator = source_tokens_generator(tokenized_dataset)
         source_dictionary = IndexDictionary(source_generator, mode='source')
         target_generator = target_tokens_generator(tokenized_dataset)
         target_dictionary = IndexDictionary(target_generator, mode='target')
 
-        source_dictionary.save(args.save_data_dir)
-        target_dictionary.save(args.save_data_dir)
+        source_dictionary.save(config["save_data_dir"])
+        target_dictionary.save(config["save_data_dir"])
 
-    source_dictionary = IndexDictionary.load(args.save_data_dir, mode='source')
-    target_dictionary = IndexDictionary.load(args.save_data_dir, mode='target')
+    source_dictionary = IndexDictionary.load(config["save_data_dir"], mode='source')
+    target_dictionary = IndexDictionary.load(config["save_data_dir"], mode='target')
 
-    IndexedInputTargetTranslationDataset.prepare(args.save_data_dir, source_dictionary, target_dictionary)
-    indexed_translation_dataset = IndexedInputTargetTranslationDataset(args.save_data_dir, 'train')
-    indexed_translation_dataset_on_the_fly = IndexedInputTargetTranslationDatasetOnTheFly('train', source_dictionary, target_dictionary)
+    IndexedInputTargetTranslationDataset.prepare(config["save_data_dir"],
+                                                 source_dictionary,
+                                                 target_dictionary)
+    indexed_translation_dataset = IndexedInputTargetTranslationDataset(config["save_data_dir"],
+                                                                       'train')
+    indexed_translation_dataset_on_the_fly = IndexedInputTargetTranslationDatasetOnTheFly('train',
+                                                                                          source_dictionary,
+                                                                                          target_dictionary)
     assert indexed_translation_dataset[0] == indexed_translation_dataset_on_the_fly[0]
 
     print('Done datasets preparation.')
