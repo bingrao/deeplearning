@@ -8,15 +8,11 @@ from utils.log import get_logger
 from utils.pipe import input_target_collate_fn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from argparse import ArgumentParser
 import random
-import torch
-import numpy as np
 from tqdm import tqdm
 from os.path import dirname, abspath, join, exists
 from os import makedirs
 from datetime import datetime
-import json
 import json
 from argparse import ArgumentParser
 import numpy as np
@@ -25,7 +21,7 @@ import torch.nn as nn
 import time
 from torch.autograd import Variable
 from models import build_model
-from torchtext import data, datasets
+# from torchtext import data
 
 PAD_INDEX = 0
 BASE_DIR = dirname(abspath(__file__))

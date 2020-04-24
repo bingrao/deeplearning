@@ -88,7 +88,7 @@ if __name__ == "__main__":
     )
 
     print('Evaluating...')
-    test_dataset = TranslationDataset(config['data_dir'], args.phase, limit=1000)
+    test_dataset = TranslationDataset(config, args.phase, limit=1000)
     bleu_score = evaluator.evaluate_dataset(test_dataset)
     print('Evaluation time :', datetime.now() - timestamp)
 
