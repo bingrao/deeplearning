@@ -269,11 +269,11 @@ class Decoder(nn.Module):
         self.norm = LayerNorm(layer.size)
 
         # Generator Solution 1
-        self.generator = Generator(embedding)
+        # self.generator = Generator(embedding)
 
         # Generator Solution 2
-        # self.generator = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
-        # self.generator.weight = self.embedding.weight
+        self.generator = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
+        self.generator.weight = self.embedding.weight
 
     def forward(self, x, memory, src_mask, tgt_mask=None, state=None):
         # x: (batch_size, seq_len - 1, d_model)
