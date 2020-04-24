@@ -6,7 +6,13 @@ import torch.nn.functional as F
 from collections import defaultdict
 from embeddings import PositionalEncoding
 from utils.pad import pad_masking, subsequent_masking
+
 PAD_TOKEN_ID = 0
+
+
+def clones(module, N):
+    "Produce N identical layers."
+    return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
 
 class LayerNorm(nn.Module):
@@ -14,6 +20,7 @@ class LayerNorm(nn.Module):
     Construct a layernorm module
     (See citation for details: https://arxiv.org/abs/1607.06450).
     """
+
     def __init__(self, features_count, epsilon=1e-6):
         super(LayerNorm, self).__init__()
 
@@ -34,6 +41,7 @@ class SublayerConnection(nn.Module):
     Note for code simplicity the norm is first as opposed to last.
     (See citation for details: https://arxiv.org/abs/1512.03385).
     """
+
     def __init__(self, size, dropout):
         super(SublayerConnection, self).__init__()
         self.norm = LayerNorm(size)
@@ -58,6 +66,7 @@ class Sublayer(nn.Module):
 
 class Generator(nn.Module):
     "Define standard linear + softmax generation step."
+
     def __init__(self, embedding):
         super(Generator, self).__init__()
         self.proj = nn.Linear(embedding.embedding_dim, embedding.num_embeddings)
@@ -79,7 +88,7 @@ class MultiHeadedAttention(nn.Module):
         self.mode = mode
 
         self.query_projection = nn.Linear(d_model, heads_count * self.d_head)
-        self.key_projection =   nn.Linear(d_model, heads_count * self.d_head)
+        self.key_projection = nn.Linear(d_model, heads_count * self.d_head)
         self.value_projection = nn.Linear(d_model, heads_count * self.d_head)
         self.final_projection = nn.Linear(d_model, heads_count * self.d_head)
 
@@ -91,17 +100,17 @@ class MultiHeadedAttention(nn.Module):
         self.key_projected = None
         self.value_projected = None
 
-    def attention(query, key, value, mask=None, dropout=None):
-        "Compute 'Scaled Dot Product Attention'"
-        d_k = query.size(-1)
-        scores = torch.matmul(query, key.transpose(-2, -1)) \
-                 / math.sqrt(d_k)
-        if mask is not None:
-            scores = scores.masked_fill(mask == 0, -1e9)
-        p_attn = F.softmax(scores, dim=-1)
-        if dropout is not None:
-            p_attn = dropout(p_attn)
-        return torch.matmul(p_attn, value), p_attn
+    # def attention(self, query, key, value, mask=None, dropout=None):
+    #     "Compute 'Scaled Dot Product Attention'"
+    #     d_k = query.size(-1)
+    #     scores = torch.matmul(query, key.transpose(-2, -1)) \
+    #              / math.sqrt(d_k)
+    #     if mask is not None:
+    #         scores = scores.masked_fill(mask == 0, -1e9)
+    #     p_attn = F.softmax(scores, dim=-1)
+    #     if dropout is not None:
+    #         p_attn = dropout(p_attn)
+    #     return torch.matmul(p_attn, value), p_attn
 
     def forward(self, query, key, value, mask=None, layer_cache=None):
         """
@@ -201,6 +210,7 @@ class PointwiseFeedForwardNetwork(nn.Module):
 
     Implements FFN equation.
     """
+
     def __init__(self, d_ff, d_model, dropout_prob):
         super(PointwiseFeedForwardNetwork, self).__init__()
         self.w_1 = nn.Linear(d_model, d_ff)
@@ -222,13 +232,12 @@ class PointwiseFeedForwardNetwork(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, layers_count, d_model, heads_count, d_ff, dropout_prob, embedding):
+    def __init__(self, layer, N, d_model, embedding):
         super(Encoder, self).__init__()
         self.d_model = d_model
         self.embedding = embedding
-        self.layers = nn.ModuleList(
-            [EncoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
-        )
+        self.layers = clones(layer, N)
+        self.norm = LayerNorm(layer.size)
 
     def forward(self, sources, mask):
         """
@@ -244,29 +253,44 @@ class Encoder(nn.Module):
 
 
 class EncoderLayer(nn.Module):
-    def __init__(self, d_model, heads_count, d_ff, dropout_prob):
+    "Encoder is made up of self-attn and feed forward (defined below)"
+
+    # def __init__(self, d_model, heads_count, d_ff, dropout_prob):
+    def __init__(self, d_model, self_attn, feed_forward, dropout):
         super(EncoderLayer, self).__init__()
 
-        self.self_attn = Sublayer(MultiHeadedAttention(heads_count, d_model, dropout_prob), d_model)
-        self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
-        self.dropout = nn.Dropout(dropout_prob)
+        self.self_attn = self_attn
+        self.feed_forward = feed_forward
+        self.sublayer = clones(SublayerConnection(d_model, dropout), 2)
+        self.size = d_model
+        self.dropout = nn.Dropout(dropout)
+
+        # self.self_attn = Sublayer(MultiHeadedAttention(heads_count, d_model, dropout_prob), d_model)
+        # self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
 
     def forward(self, x, mask):
         # x: (batch_size, seq_len, d_model)
-        x = self.self_attn(x, x, x, mask)
+        # x = self.self_attn(x, x, x, mask)
+        # x = self.dropout(x)
+        # x = self.feed_forward(x)
+        # return x
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         x = self.dropout(x)
-        x = self.feed_forward(x)
-        return x
+        return self.sublayer[1](x, self.feed_forward)
 
 
 class Decoder(nn.Module):
-    def __init__(self, layers_count, d_model, heads_count, d_ff, dropout_prob, embedding):
+    def __init__(self, layer, N, d_model, embedding):
         super(Decoder, self).__init__()
         self.d_model = d_model
         self.embedding = embedding
-        self.layers = nn.ModuleList(
-            [DecoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
-        )
+
+        self.layers = clones(layer, N)
+        self.norm = LayerNorm(layer.size)
+
+        # self.layers = nn.ModuleList(
+        #     [DecoderLayer(d_model, heads_count, d_ff, dropout_prob) for _ in range(layers_count)]
+        # )
 
         # Generator Solution 1
         self.generator = Generator(embedding)
@@ -307,6 +331,7 @@ class Decoder(nn.Module):
                 )
 
         generated = self.generator(x)  # (batch_size, seq_len, vocab_size)
+        # generated = self.norm(x)
         return generated, state
 
     def init_decoder_state(self, **args):
@@ -317,22 +342,33 @@ class DecoderLayer(nn.Module):
     """
     Decoder is made of self-attn, src-attn, and feed forward
     """
-    def __init__(self, d_model, heads_count, d_ff, dropout_prob):
+
+    def __init__(self, d_model, self_attn, src_attn, feed_forward, dropout):
         super(DecoderLayer, self).__init__()
-        self.self_attn = Sublayer(
-            MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='self-attention'), d_model)
-        self.src_attn = Sublayer(
-            MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='memory-attention'), d_model)
-        self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
+        self.size = d_model
+        self.self_attn = self_attn
+        self.src_attn = src_attn
+        self.feed_forward = feed_forward
+        self.sublayer = clones(SublayerConnection(d_model, dropout), 3)
+        # self.self_attn = Sublayer(
+        #     MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='self-attention'), d_model)
+        # self.src_attn = Sublayer(
+        #     MultiHeadedAttention(heads_count, d_model, dropout_prob, mode='memory-attention'), d_model)
+        # self.feed_forward = Sublayer(PointwiseFeedForwardNetwork(d_ff, d_model, dropout_prob), d_model)
 
     def forward(self, x, memory, src_mask, tgt_mask, layer_cache=None):
+        "Follow Figure 1 (right) for connections."
+        m = memory
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask, layer_cache))
+        x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask, layer_cache))
+        return self.sublayer[2](x, self.feed_forward)
         # print('self attention')
         # print('inputs_mask', inputs_mask)
-        x = self.self_attn(x, x, x, tgt_mask, layer_cache)
+        # x = self.self_attn(x, x, x, tgt_mask, layer_cache)
         # print('memory attention')
-        x = self.src_attn(x, memory, memory, src_mask, layer_cache)
-        x = self.feed_forward(x)
-        return x
+        # x = self.src_attn(x, memory, memory, src_mask, layer_cache)
+        # x = self.feed_forward(x)
+        # return x
 
 
 class DecoderState:
@@ -361,11 +397,14 @@ class DecoderState:
 
 
 class Transformer(nn.Module):
-    def __init__(self, encoder, decoder):
+    def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
         super(Transformer, self).__init__()
 
         self.encoder = encoder
         self.decoder = decoder
+        self.src_embed = src_embed
+        self.tgt_embed = tgt_embed
+        self.generator = generator
 
     def forward(self, sources, inputs):
         # sources : (batch_size, sources_len)
@@ -403,21 +442,30 @@ def build_model(config, source_vocabulary_size, target_vocabulary_size):
             num_embeddings=target_vocabulary_size,
             embedding_dim=config['d_model'])
 
-    encoder = Encoder(layers_count=config['layers_count'],
-                      d_model=config['d_model'],
-                      heads_count=config['heads_count'],
-                      d_ff=config['d_ff'],
-                      dropout_prob=config['dropout_prob'],
+    c = copy.deepcopy
+    d_model = config['d_model']
+    d_ff = config['d_ff']
+    dropout = config['dropout_prob']
+    N = config['layers_count']
+    h = config['heads_count']  # heads_count
+    attn = MultiHeadedAttention(h, d_model)
+    ff = PointwiseFeedForwardNetwork(d_ff, d_model, dropout)
+
+    encoder = Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout),  # encode layer
+                      N,  # nums of layers in encode
+                      d_model,  # Dim of vector
                       embedding=source_embedding)
 
-    decoder = Decoder(layers_count=config['layers_count'],
-                      d_model=config['d_model'],
-                      heads_count=config['heads_count'],
-                      d_ff=config['d_ff'],
-                      dropout_prob=config['dropout_prob'],
-                      embedding=target_embedding)
+    decoder = Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout),
+                      N,  # nums of layers in encode
+                      d_model,  # Dim of vector
+                      embedding=target_embedding),
 
-    model = Transformer(encoder, decoder)
+    model = Transformer(encoder,
+                        decoder,
+                        source_embedding,
+                        target_embedding,
+                        Generator(target_embedding))
 
     # This was important from their code.
     # Initialize parameters with Glorot / fan_avg.
