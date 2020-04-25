@@ -11,4 +11,11 @@ tgt_train_path=${Data_Raw}/tgt-train.txt
 src_val_path=${Data_Raw}/src-val.txt
 tgt_val_path=${Data_Raw}/tgt-val.txt
 
-python ${Src_Dir}/predict.py --train_source=${src_train_path} --train_target=${tgt_train_path} --val_source=${src_val_path} --val_target=${tgt_val_path} --save_data_dir=${Data_Processed} --source="There is an imbalance here ." --config=checkpoints/example_config.json --checkpoint=checkpoints/example_model.pth
+python ${Src_Dir}/predict.py --train_source=${src_train_path} \
+                             --train_target=${tgt_train_path} \
+                             --val_source=${src_val_path} \
+                             --val_target=${tgt_val_path} \
+                             --save_data_dir=${Data_Processed} \
+                             --source="There is an imbalance here ." \
+                             --config=checkpoints/example_config.json \
+                             --checkpoint=checkpoints/example_model.pth

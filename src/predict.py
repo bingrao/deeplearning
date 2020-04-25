@@ -6,6 +6,7 @@ from beam import Beam
 from utils.pad import pad_masking
 import torch
 from argument import get_config
+from utils.log import get_logger
 
 
 class Predictor:
@@ -75,14 +76,14 @@ class Predictor:
 
 
 if __name__ == "__main__":
+    logger = get_logger()
+    config = get_config('Predict translation', logger=logger)
 
-    config = get_config('Predict translation')
-
-    print('Constructing dictionaries...')
+    logger.info('Constructing dictionaries...')
     source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
     target_dictionary = IndexDictionary.load(config['data_dir'], mode='target', vocabulary_size=config['vocabulary_size'])
 
-    print('Building model...')
+    logger.info('Building model...')
     model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
     predictor = Predictor(
@@ -93,4 +94,4 @@ if __name__ == "__main__":
     )
 
     for index, candidate in enumerate(predictor.predict_one(config["source"], num_candidates=config["num_candidates"])):
-        print(f'Candidate {index} : {candidate}')
+        logger.info(f'Candidate {index} : {candidate}')

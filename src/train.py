@@ -218,11 +218,16 @@ class MultiGPULossCompute:
 
 class TransformerTrainer:
 
-    def __init__(self, model,
-                 train_dataloader, val_dataloader,
-                 loss_function, metric_function, optimizer,
-                 logger, run_name,
-                 save_config, save_checkpoint,
+    def __init__(self, model,       # Transformer model
+                 train_dataloader,  # train dataset loader
+                 val_dataloader,    # validate dataset loader
+                 loss_function,     # loss function
+                 metric_function,   # Accuracy Function
+                 optimizer,         # Model Optimizer
+                 logger,            # logger agent
+                 run_name,          # String Name
+                 save_config,       # Path to save configure
+                 save_checkpoint,   # Path to save checkpoint
                  config):
 
         self.config = config
@@ -247,6 +252,7 @@ class TransformerTrainer:
             config_filepath = join(self.checkpoint_dir, 'config.json')
         else:
             config_filepath = save_config
+
         with open(config_filepath, 'w') as config_file:
             json.dump(self.config, config_file)
 
@@ -282,7 +288,7 @@ class TransformerTrainer:
         batch_metrics = []
         for sources, inputs, targets in tqdm(dataloader):
             sources, inputs, targets = sources.to(self.device), inputs.to(self.device), targets.to(self.device)
-            outputs = self.model(sources, inputs)
+            outputs = self.model.forward(sources, inputs)
 
             batch_loss, batch_count = self.loss_function(outputs, targets)
 

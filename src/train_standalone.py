@@ -37,18 +37,24 @@ def run_trainer_standalone(config):
     logger.info(config)
 
     logger.info('Constructing dictionaries...')
-    source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
-    target_dictionary = IndexDictionary.load(config['data_dir'], mode='target', vocabulary_size=config['vocabulary_size'])
-    logger.info(f'Source dictionary vocabulary : {source_dictionary.vocabulary_size} tokens')
-    logger.info(f'Target dictionary vocabulary : {target_dictionary.vocabulary_size} tokens')
+    source_dictionary = IndexDictionary.load(config['data_dir'], mode='source',
+                                             vocabulary_size=config['vocabulary_size'])
+    logger.info(f'Source dictionary vocabulary Size: {source_dictionary.vocabulary_size} tokens')
+
+    target_dictionary = IndexDictionary.load(config['data_dir'], mode='target',
+                                             vocabulary_size=config['vocabulary_size'])
+    logger.info(f'Target dictionary vocabulary Size: {target_dictionary.vocabulary_size} tokens')
 
     logger.info('Building model...')
     model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
     logger.info(model)
-    logger.info('Encoder : {parameters_count} parameters'.format(parameters_count=sum([p.nelement() for p in model.encoder.parameters()])))
-    logger.info('Decoder : {parameters_count} parameters'.format(parameters_count=sum([p.nelement() for p in model.decoder.parameters()])))
-    logger.info('Total : {parameters_count} parameters'.format(parameters_count=sum([p.nelement() for p in model.parameters()])))
+    logger.info('Encoder : {parameters_count} parameters'.format(
+        parameters_count=sum([p.nelement() for p in model.encoder.parameters()])))
+    logger.info('Decoder : {parameters_count} parameters'.format(
+        parameters_count=sum([p.nelement() for p in model.decoder.parameters()])))
+    logger.info('Total : {parameters_count} parameters'.format(
+        parameters_count=sum([p.nelement() for p in model.parameters()])))
 
     logger.info('Loading datasets...')
     train_dataset = IndexedInputTargetTranslationDataset(config=config, phase='train')
@@ -102,4 +108,4 @@ def run_trainer_standalone(config):
 
 
 if __name__ == '__main__':
-    run_trainer_standalone(get_config())
+    run_trainer_standalone(get_config(logger=get_logger()))

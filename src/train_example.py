@@ -41,7 +41,7 @@ def train_simple_with_dummy_data(V=11):
     # Train the simple copy task.
     criterion = LabelSmoothing(size=V, padding_idx=0, smoothing=0.0)
     logger.info(criterion)
-    model = build_model(get_config(), V, V)
+    model = build_model(get_config(logger=get_logger()), V, V)
     logger.info(model)
     model_opt = NoamOpt(model.src_embed[0].d_model, 1, 400,
                         torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))

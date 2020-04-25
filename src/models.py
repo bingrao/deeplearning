@@ -368,14 +368,18 @@ class Transformer(nn.Module):
         self.generator = generator
 
     def forward(self, src, tgt, src_mask=None, tgt_mask=None):
+
         # src : (batch_size, src_len)
         # tgt : (batch_size, targets_len - 1)
         batch_size, src_len = src.size()
         batch_size, tgt_len = tgt.size()
 
-        src_mask = pad_masking(src, src_len)
+        if src_mask is None:
+            src_mask = pad_masking(src, src_len)
+
         memory_mask = pad_masking(src, tgt_len)
-        tgt_mask = subsequent_masking(tgt) | pad_masking(tgt, tgt_len)
+        if tgt_mask is None:
+            tgt_mask = subsequent_masking(tgt) | pad_masking(tgt, tgt_len)
 
         # (batch_size, seq_len, d_model)
         memory = self.encoder(self.src_embed(src), src_mask)  # Context Vectors

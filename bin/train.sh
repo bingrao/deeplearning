@@ -11,4 +11,12 @@ tgt_train_path=${Data_Raw}/tgt-train.txt
 src_val_path=${Data_Raw}/src-val.txt
 tgt_val_path=${Data_Raw}/tgt-val.txt
 
-python ${Src_Dir}/train_standalone.py --train_source=${src_train_path} --train_target=${tgt_train_path} --val_source=${src_val_path} --val_target=${tgt_val_path} --save_data_dir=${Data_Processed} --data_dir=${Data_Processed} --save_config=${Data_Checkpoint}/example_config.json --save_checkpoint=${Data_Checkpoint}/example_model.pth --save_log=${Project_Home}/logs/example.log
+python ${Src_Dir}/train_standalone.py --train_source=${src_train_path} \
+                                      --train_target=${tgt_train_path} \
+                                      --val_source=${src_val_path} \
+                                      --val_target=${tgt_val_path} \
+                                      --save_data_dir=${Data_Processed} \
+                                      --data_dir=${Data_Processed} \
+                                      --save_config=${Data_Checkpoint}/example_config.json \
+                                      --save_checkpoint=${Data_Checkpoint}/example_model.pth \
+                                      --save_log=${Project_Home}/logs/example.log

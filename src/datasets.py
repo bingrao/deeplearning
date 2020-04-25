@@ -2,11 +2,11 @@ from os.path import dirname, abspath, join, exists
 from os import makedirs
 from dictionaries import IndexDictionary
 from utils.pipe import shared_tokens_generator, source_tokens_generator, target_tokens_generator
-from argparse import ArgumentParser
 from dictionaries import START_TOKEN, END_TOKEN
 from utils.log import get_logger
 import logging
 from argument import get_config
+import torch
 
 UNK_INDEX = 1
 
@@ -274,7 +274,7 @@ class IndexedInputTargetTranslationDatasetOnTheFly:
         return preprocess_function
 
 
-class IndexedInputTargetTranslationDataset:
+class IndexedInputTargetTranslationDataset(torch.utils.data.Dataset):
     def __init__(self, config, phase):
 
         # [(indexed_sources, indexed_inputs, indexed_targets), (indexed_sources, indexed_inputs, indexed_targets)]
@@ -375,9 +375,9 @@ class IndexedInputTargetTranslationDataset:
 
 
 if __name__ == "__main__":
-    config = get_config('Prepare datasets')
+
     logger = get_logger("[Prepare_Dataset]-")
-    logger.info(config)
+    config = get_config('Prepare datasets', logger=logger)
 
     if logger.isEnabledFor(logging.DEBUG):
         # Preparing Raw train/val dataset: a file of each line (src, tgt)

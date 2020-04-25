@@ -3,7 +3,7 @@ import json
 import torch
 
 
-def get_config(desc='Train Transformer'):
+def get_config(desc='Train Transformer', logger=None):
     parser = ArgumentParser(description=desc)
     # Prediction
     parser.add_argument('--source', type=str)
@@ -40,8 +40,8 @@ def get_config(desc='Train Transformer'):
     parser.add_argument('--positional_encoding', action='store_true')
 
     parser.add_argument('--d_model', type=int, default=16)
-    parser.add_argument('--layers_count', type=int, default=6)
-    parser.add_argument('--heads_count', type=int, default=8)
+    parser.add_argument('--layers_count', type=int, default=2)
+    parser.add_argument('--heads_count', type=int, default=4)
     parser.add_argument('--d_ff', type=int, default=32)
     parser.add_argument('--dropout_prob', type=float, default=0.1)
 
@@ -65,5 +65,13 @@ def get_config(desc='Train Transformer'):
                 config[key] = default_value
     else:
         config = vars(args)  # convert to dictionary
+
+    if logger is None:
+        output = print
+    else:
+        output = logger.info
+    output("The Input Parameters:")
+    for key, val in config.items():
+        output(f"{key} => {val}")
 
     return config

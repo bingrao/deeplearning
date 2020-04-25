@@ -15,13 +15,11 @@ class IndexDictionary:
     def __init__(self, iterable=None, mode='shared', vocabulary_size=None):
 
         self.special_tokens = [PAD_TOKEN, UNK_TOKEN, START_TOKEN, END_TOKEN]
-
         # On-the-fly mode
         if iterable is not None:
             self.vocab_tokens, self.token_counts = self._build_vocabulary(iterable, vocabulary_size)
             self.token_index_dict = {token: index for index, token in enumerate(self.vocab_tokens)}
             self.vocabulary_size = len(self.vocab_tokens)
-
         self.mode = mode
 
     def token_to_index(self, token):
@@ -61,7 +59,6 @@ class IndexDictionary:
         return vocab_tokens, token_counts
 
     def save(self, data_dir):
-
         vocabulary_filepath = join(data_dir, f'vocabulary-{self.mode}.txt')
         with open(vocabulary_filepath, 'w') as file:
             for vocab_index, (vocab_token, count) in enumerate(zip(self.vocab_tokens, self.token_counts)):
@@ -71,8 +68,8 @@ class IndexDictionary:
     def load(cls, data_dir, mode='shared', vocabulary_size=None):
         vocabulary_filepath = join(data_dir, f'vocabulary-{mode}.txt')
 
-        vocab_tokens = {}
-        token_counts = []
+        vocab_tokens = {}   # {1:"a", 2:"b", ...}
+        token_counts = []   # [3, 4, 5, 6, ...]
         with open(vocabulary_filepath) as file:
             for line in file:
                 vocab_index, vocab_token, count = line.strip().split('\t')

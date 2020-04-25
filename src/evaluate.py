@@ -7,6 +7,7 @@ from datetime import datetime
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 from tqdm import tqdm
 from argument import get_config
+from utils.log import get_logger
 
 
 class Evaluator:
@@ -47,7 +48,7 @@ class Evaluator:
 
 
 if __name__ == "__main__":
-    config = get_config('Predict translation')
+    config = get_config('Predict translation', get_logger())
 
     print('Constructing dictionaries...')
     source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
