@@ -397,8 +397,6 @@ class Transformer(nn.Module):
 def build_model(ctx, src_vocab_size, tgt_vocab_size):
     c = copy.deepcopy
     config = ctx.config
-    logger = ctx.logger
-
     N = config['layers_count']
     d_model = config['d_model']
     d_ff = config['d_ff']

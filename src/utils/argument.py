@@ -1,9 +1,8 @@
 from argparse import ArgumentParser
-import json
 import torch
 
 
-def get_config(desc='Train Transformer', logger=None):
+def get_config(desc='Train Transformer'):
     parser = ArgumentParser(description=desc)
 
     # Prediction
@@ -51,18 +50,4 @@ def get_config(desc='Train Transformer', logger=None):
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=100)
 
-    args = parser.parse_args()
-
-    # if args.config is not None:
-    #     with open(args.config) as f:
-    #         config = json.load(f)
-    #
-    #     default_config = vars(args)
-    #     for key, default_value in default_config.items():
-    #         if key not in config:
-    #             config[key] = default_value
-    # else:
-    #     config = vars(args)  # convert to dictionary
-    config = vars(args)  # convert to dictionary
-
-    return config
+    return vars(parser.parse_args())  # convert to dictionary

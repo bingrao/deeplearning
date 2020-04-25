@@ -4,7 +4,7 @@ from dictionaries import IndexDictionary
 from beam import Beam
 from utils.pad import pad_masking
 import torch
-from argument import get_config
+from utils.argument import get_config
 from utils.log import get_logger
 
 

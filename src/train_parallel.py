@@ -2,7 +2,7 @@ import torch.nn as nn
 import time
 from torch.autograd import Variable
 from torchtext import data
-from argument import get_config
+from utils.argument import get_config
 from datasets import IndexedInputTargetTranslationDataset
 from dictionaries import IndexDictionary
 from optimizers import NoamOptimizer

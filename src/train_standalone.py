@@ -1,10 +1,8 @@
-from argument import get_config
 from datasets import IndexedInputTargetTranslationDataset
 from dictionaries import IndexDictionary
 from losses import TokenCrossEntropyLoss, LabelSmoothingLoss
 from metrics import AccuracyMetric
 from optimizers import NoamOptimizer
-from utils.log import get_logger
 from utils.pipe import input_target_collate_fn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -17,7 +15,7 @@ import json
 import numpy as np
 import torch
 from models import build_model
-from context import Context
+from utils.context import Context
 
 
 class TransformerTrainer:
@@ -27,15 +25,14 @@ class TransformerTrainer:
                  loss_function,     # loss function
                  metric_function,   # Accuracy Function
                  optimizer,         # Model Optimizer
+                 # logger,            # logger agent
                  run_name,          # String Name
                  ctx):
 
-        self.context = ctx
         self.config = ctx.config
-        self.logger = ctx.logger
         self.device = torch.device(self.config['device'])
         self.save_data_dir = self.config["save_data_dir"]
-
+        self.run_name = run_name
         self.model = model.to(self.device)
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
@@ -45,7 +42,7 @@ class TransformerTrainer:
         self.optimizer = optimizer
         self.clip_grads = self.config['clip_grads']
 
-
+        self.logger = ctx.logger
         self.checkpoint_dir = join(self.save_data_dir, 'checkpoints', run_name)
 
         if not exists(self.checkpoint_dir):
@@ -196,21 +193,20 @@ class TransformerTrainer:
 
 
 def run_trainer_standalone(ctx):
-    config = ctx.config
-    logger = ctx.logger
-
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
-    run_name_format = (
+    config = ctx.config
+    logger = ctx.logger
+
+    run_name = (
         "d_model={d_model}-"
         "layers_count={layers_count}-"
         "heads_count={heads_count}-"
         "pe={positional_encoding}-"
         "optimizer={optimizer}-"
         "{timestamp}"
-    )
-    run_name = run_name_format.format(**config, timestamp=datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+    ).format(**config, timestamp=datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
 
     logger.info(f'Run name : {run_name}')
     logger.info(config)
@@ -284,4 +280,4 @@ def run_trainer_standalone(ctx):
 
 
 if __name__ == '__main__':
-    run_trainer_standalone(Context(desc="train"))
+    run_trainer_standalone(Context(desc="Train"))
