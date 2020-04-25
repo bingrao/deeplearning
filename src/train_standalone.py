@@ -17,6 +17,7 @@ import json
 import numpy as np
 import torch
 from models import build_model
+from context import Context
 
 
 class TransformerTrainer:
@@ -26,13 +27,14 @@ class TransformerTrainer:
                  loss_function,     # loss function
                  metric_function,   # Accuracy Function
                  optimizer,         # Model Optimizer
-                 logger,            # logger agent
                  run_name,          # String Name
-                 config):
+                 ctx):
 
-        self.config = config
+        self.context = ctx
+        self.config = ctx.config
+        self.logger = ctx.logger
         self.device = torch.device(self.config['device'])
-        self.save_data_dir = config["save_data_dir"]
+        self.save_data_dir = self.config["save_data_dir"]
 
         self.model = model.to(self.device)
         self.train_dataloader = train_dataloader
@@ -43,16 +45,16 @@ class TransformerTrainer:
         self.optimizer = optimizer
         self.clip_grads = self.config['clip_grads']
 
-        self.logger = logger
+
         self.checkpoint_dir = join(self.save_data_dir, 'checkpoints', run_name)
 
         if not exists(self.checkpoint_dir):
             makedirs(self.checkpoint_dir)
 
-        if config["save_config"] is None:
+        if self.config["save_config"] is None:
             config_filepath = join(self.save_data_dir, 'checkpoints','config.json')
         else:
-            config_filepath = config["save_config"]
+            config_filepath = self.config["save_config"]
 
         with open(config_filepath, 'w') as config_file:
             json.dump(self.config, config_file)
@@ -68,7 +70,7 @@ class TransformerTrainer:
         self.best_val_metric = None
         self.best_checkpoint_filepath = None
 
-        self.checkpoint = config["checkpoint"]
+        self.checkpoint = self.config["checkpoint"]
         self.save_format = 'epoch={epoch:0>3}-val_loss={val_loss:<.3}-val_metrics={val_metrics}.pth'
 
         self.log_format = (
@@ -193,11 +195,13 @@ class TransformerTrainer:
         return str(elapsed).split('.')[0]  # remove milliseconds
 
 
-def run_trainer_standalone(config):
+def run_trainer_standalone(ctx):
+    config = ctx.config
+    logger = ctx.logger
+
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
-
     run_name_format = (
         "d_model={d_model}-"
         "layers_count={layers_count}-"
@@ -206,10 +210,8 @@ def run_trainer_standalone(config):
         "optimizer={optimizer}-"
         "{timestamp}"
     )
-
     run_name = run_name_format.format(**config, timestamp=datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
 
-    logger = get_logger(run_name, save_log=config['save_log'])
     logger.info(f'Run name : {run_name}')
     logger.info(config)
 
@@ -223,7 +225,7 @@ def run_trainer_standalone(config):
     logger.info(f'Target dictionary vocabulary Size: {target_dictionary.vocabulary_size} tokens')
 
     logger.info('Building model...')
-    model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
+    model = build_model(ctx, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
     logger.info(model)
     logger.info('Encoder : {parameters_count} parameters'.format(
@@ -234,9 +236,9 @@ def run_trainer_standalone(config):
         parameters_count=sum([p.nelement() for p in model.parameters()])))
 
     logger.info('Loading datasets...')
-    train_dataset = IndexedInputTargetTranslationDataset(config=config, phase='train')
+    train_dataset = IndexedInputTargetTranslationDataset(ctx=ctx, phase='train')
 
-    val_dataset = IndexedInputTargetTranslationDataset(config=config, phase='val')
+    val_dataset = IndexedInputTargetTranslationDataset(ctx=ctx, phase='val')
 
     train_dataloader = DataLoader(
         train_dataset,
@@ -272,9 +274,8 @@ def run_trainer_standalone(config):
         loss_function=loss_function,
         metric_function=accuracy_function,
         optimizer=optimizer,
-        logger=logger,
         run_name=run_name,
-        config=config
+        ctx=ctx
     )
 
     trainer.run(config['epochs'])
@@ -283,4 +284,4 @@ def run_trainer_standalone(config):
 
 
 if __name__ == '__main__':
-    run_trainer_standalone(get_config(logger=get_logger()))
+    run_trainer_standalone(Context(desc="train"))

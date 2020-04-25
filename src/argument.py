@@ -8,7 +8,6 @@ def get_config(desc='Train Transformer', logger=None):
 
     # Prediction
     parser.add_argument('--source', type=str)
-    # parser.add_argument('--config', type=str, default=None)
     parser.add_argument('--checkpoint', type=str, default=None)
     parser.add_argument('--num_candidates', type=int, default=3)
 
@@ -65,12 +64,5 @@ def get_config(desc='Train Transformer', logger=None):
     # else:
     #     config = vars(args)  # convert to dictionary
     config = vars(args)  # convert to dictionary
-    if logger is None:
-        output = print
-    else:
-        output = logger.info
-    output("The Input Parameters:")
-    for key, val in config.items():
-        output(f"{key} => {val}")
 
     return config

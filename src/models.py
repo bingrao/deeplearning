@@ -394,8 +394,10 @@ class Transformer(nn.Module):
 # d_ff=2048,
 # h=8,
 # dropout=0.1
-def build_model(config, src_vocab_size, tgt_vocab_size):
+def build_model(ctx, src_vocab_size, tgt_vocab_size):
     c = copy.deepcopy
+    config = ctx.config
+    logger = ctx.logger
 
     N = config['layers_count']
     d_model = config['d_model']
