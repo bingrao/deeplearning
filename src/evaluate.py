@@ -7,6 +7,7 @@ from datetime import datetime
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 from tqdm import tqdm
 from utils.argument import get_config
+from utils.context import Context
 
 
 class Evaluator:
@@ -47,21 +48,19 @@ class Evaluator:
 
 
 if __name__ == "__main__":
-    config = get_config('Predict translation')
 
-    print('Constructing dictionaries...')
+    context = Context("Evaluation")
+    config = context.config
+    logger = context.logger
+
+    logger.info('Constructing dictionaries...')
     source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
     target_dictionary = IndexDictionary.load(config['data_dir'], mode='target', vocabulary_size=config['vocabulary_size'])
 
-    print('Building model...')
+    logger.info('Building model...')
     model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
-    predictor = Predictor(
-        preprocess=IndexedInputTargetTranslationDataset.preprocess(source_dictionary),
-        postprocess=lambda x: ' '.join([token for token in target_dictionary.tokenify_indexes(x) if token != '<EndSent>']),
-        model=model,
-        checkpoint_filepath=config["checkpoint"]
-    )
+    predictor = Predictor(ctx=context, m=model, src_dictionary=source_dictionary, tgt_dictionary=target_dictionary)
 
     timestamp = datetime.now()
     if config["save_result"] is None:
@@ -76,9 +75,9 @@ if __name__ == "__main__":
         save_filepath=eval_filepath
     )
 
-    print('Evaluating...')
+    logger.info('Evaluating...')
     test_dataset = TranslationDataset(config, config["phase"], limit=1000)
     bleu_score = evaluator.evaluate_dataset(test_dataset)
-    print('Evaluation time :', datetime.now() - timestamp)
+    logger.info('Evaluation time :', datetime.now() - timestamp)
 
-    print("BLEU score :", bleu_score)
+    logger.info("BLEU score :", bleu_score)

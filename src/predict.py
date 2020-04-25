@@ -4,36 +4,51 @@ from dictionaries import IndexDictionary
 from beam import Beam
 from utils.pad import pad_masking
 import torch
-from utils.argument import get_config
-from utils.log import get_logger
+from utils.context import Context
 
 
 class Predictor:
-    def __init__(self, preprocess, postprocess, model, checkpoint_filepath, max_length=30, beam_size=8):
-        self.preprocess = preprocess
-        self.postprocess = postprocess
-        self.model = model
+    def __init__(self, ctx, m, src_dictionary, tgt_dictionary, max_length=30, beam_size=8):
+        self.context = ctx
+        self.config = self.context.config
+        self.logger = self.context.logger
+        self.model = m
+        self.source_dictionary = src_dictionary
+        self.target_dictionary = tgt_dictionary
+
+        self.preprocess = IndexedInputTargetTranslationDataset.preprocess(self.source_dictionary)
+
+        self.postprocess = lambda x: ' '.join(
+            [token for token in self.target_dictionary.tokenify_indexes(x) if token != '<EndSent>'])
+
         self.max_length = max_length
         self.beam_size = beam_size
         self.attentions = None
         self.hypothesises = None
         self.model.eval()
-        checkpoint = torch.load(checkpoint_filepath, map_location='cpu')
-        self.model.load_state_dict(checkpoint)
+        self.checkpoint_filepath = self.config["checkpoint"]
+        self.model.load_state_dict(torch.load(self.checkpoint_filepath, map_location='cpu'))
 
-    def predict_one(self, source, num_candidates=5):
-        print("########Source: ", source)
+
+    def predict_one(self, source=None, num_candidates=None):
+
+        if source is None:
+            source = self.config["source"]
+        if num_candidates is None:
+            num_candidates = self.config["num_candidates"]
+
+        # self.logger.info("########Source: ", str(source))
         source_preprocessed = self.preprocess(source)
-        print("########source_preprocessed: ", source_preprocessed)
+        # self.logger.info("########source_preprocessed: ", str(source_preprocessed))
 
         source_tensor = torch.tensor(source_preprocessed).unsqueeze(0)  # why unsqueeze?
         length_tensor = torch.tensor(len(source_preprocessed)).unsqueeze(0)
-        print("########source_tensor", source_tensor)
+        # self.logger.info("########source_tensor", str(source_tensor))
 
         sources_mask = pad_masking(source_tensor, source_tensor.size(1))
         memory_mask = pad_masking(source_tensor, 1)
-        print("########sources_mask", sources_mask)
-        print("########memory_mask", memory_mask)
+        # self.logger.info("########sources_mask", str(sources_mask))
+        # self.logger.info("########memory_mask", str(memory_mask))
         memory = self.model.encoder(source_tensor, sources_mask)
 
         decoder_state = self.model.decoder.init_decoder_state()
@@ -50,9 +65,10 @@ class Predictor:
         for _ in range(self.max_length):
 
             new_inputs = beam.get_current_state().unsqueeze(1)  # (beam_size, seq_len=1)
-            decoder_outputs, decoder_state = self.model.decoder(new_inputs, memory_beam,
-                                                                            memory_mask,
-                                                                            state=decoder_state)
+            decoder_outputs, decoder_state = self.model.decoder(new_inputs,
+                                                                memory_beam,
+                                                                memory_mask,
+                                                                state=decoder_state)
             # decoder_outputs: (beam_size, target_seq_len=1, vocabulary_size)
             # attentions['std']: (target_seq_len=1, beam_size, source_seq_len)
 
@@ -79,25 +95,21 @@ class Predictor:
 
 
 if __name__ == "__main__":
-    logger = get_logger()
-    config = get_config('Predict translation', logger=logger)
+
+    context = Context(desc="Prediction")
+    logger = context.logger
+    config = context.config
 
     logger.info('Constructing dictionaries...')
-    source_dictionary = IndexDictionary.load(config['data_dir'], mode='source',
+    source_dictionary = IndexDictionary.load(config['save_data_dir'], mode='source',
                                              vocabulary_size=config['vocabulary_size'])
-    target_dictionary = IndexDictionary.load(config['data_dir'], mode='target',
+    target_dictionary = IndexDictionary.load(config['save_data_dir'], mode='target',
                                              vocabulary_size=config['vocabulary_size'])
 
     logger.info('Building model...')
-    model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
+    model = build_model(context, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
-    predictor = Predictor(
-        preprocess=IndexedInputTargetTranslationDataset.preprocess(source_dictionary),
-        postprocess=lambda x: ' '.join([token for token in target_dictionary.tokenify_indexes(x)
-                                        if token != '<EndSent>']),
-        model=model,
-        checkpoint_filepath=config["save_checkpoint"]
-    )
+    predictor = Predictor(ctx=context,m=model,src_dictionary=source_dictionary, tgt_dictionary=target_dictionary)
 
     for index, candidate in enumerate(predictor.predict_one(config["source"],
                                                             num_candidates=config["num_candidates"])):

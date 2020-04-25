@@ -2,19 +2,17 @@ import torch.nn as nn
 import time
 from torch.autograd import Variable
 from torchtext import data
-from utils.argument import get_config
 from datasets import IndexedInputTargetTranslationDataset
 from dictionaries import IndexDictionary
 from optimizers import NoamOptimizer
-from utils.log import get_logger
 from torch.optim import Adam
 import random
 from datetime import datetime
 import numpy as np
 import torch
 from models import build_model
+from utils.context import Context
 
-logger = get_logger("train_example")
 global max_src_in_batch, max_tgt_in_batch
 
 
@@ -220,21 +218,20 @@ def batch_size_fn(new, count, sofar):
 # This task is much smaller than the WMT task considered in the paper, but it illustrates
 # the whole system. We also show how to use multi-gpu processing to make it really fast.
 
-def train_with_example_dataset(config):
+def train_with_example_dataset(ctx):
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
-
-    run_name_format = (
+    config = ctx.config
+    logger = ctx.logger
+    run_name = (
         "d_model={d_model}-"
         "layers_count={layers_count}-"
         "heads_count={heads_count}-"
         "pe={positional_encoding}-"
         "optimizer={optimizer}-"
         "{timestamp}"
-    )
-
-    run_name = run_name_format.format(**config, timestamp=datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+    ).format(**config, timestamp=datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
 
     logger.info(f'Run name : {run_name}')
 
@@ -248,7 +245,7 @@ def train_with_example_dataset(config):
     logger.info(f'Target dictionary vocabulary Size: {target_dictionary.vocabulary_size} tokens')
 
     logger.info('Building model...')
-    model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
+    model = build_model(ctx, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
     logger.info(model)
     logger.info('Encoder : {parameters_count} parameters'.format(
@@ -259,18 +256,18 @@ def train_with_example_dataset(config):
         parameters_count=sum([p.nelement() for p in model.parameters()])))
 
     logger.info('Loading datasets...')
-    train_dataset = IndexedInputTargetTranslationDataset(config=config, phase='train')
+    train_dataset = IndexedInputTargetTranslationDataset(ctx=ctx, phase='train')
 
-    val_dataset = IndexedInputTargetTranslationDataset(config=config, phase='val')
+    val_dataset = IndexedInputTargetTranslationDataset(ctx=ctx, phase='val')
 
     if config['optimizer'] == 'Noam':
         optimizer = NoamOptimizer(model.parameters(), d_model=config['d_model'])
     elif config['optimizer'] == 'Adam':
         optimizer = Adam(model.parameters(), lr=config['lr'])
     else:
-        # raise NotImplementedError()
+        raise NotImplementedError()
 
-	pad_idx = 0
+    pad_idx = 0
     devices = [0, 1, 2, 3]
     model.cuda()
     criterion = LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
@@ -295,4 +292,4 @@ def train_with_example_dataset(config):
 
 
 if __name__ == "__main__":
-    train_with_example_dataset(get_config(logger=logger))
+    train_with_example_dataset(Context("Train_MultiGPU"))
