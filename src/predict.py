@@ -1,7 +1,6 @@
 from models import build_model
 from datasets import IndexedInputTargetTranslationDataset
 from dictionaries import IndexDictionary
-
 from beam import Beam
 from utils.pad import pad_masking
 import torch
@@ -10,7 +9,6 @@ from utils.log import get_logger
 
 
 class Predictor:
-
     def __init__(self, preprocess, postprocess, model, checkpoint_filepath, max_length=30, beam_size=8):
         self.preprocess = preprocess
         self.postprocess = postprocess
@@ -19,18 +17,23 @@ class Predictor:
         self.beam_size = beam_size
         self.attentions = None
         self.hypothesises = None
-
         self.model.eval()
         checkpoint = torch.load(checkpoint_filepath, map_location='cpu')
         self.model.load_state_dict(checkpoint)
 
     def predict_one(self, source, num_candidates=5):
+        print("########Source: ", source)
         source_preprocessed = self.preprocess(source)
+        print("########source_preprocessed: ", source_preprocessed)
+
         source_tensor = torch.tensor(source_preprocessed).unsqueeze(0)  # why unsqueeze?
         length_tensor = torch.tensor(len(source_preprocessed)).unsqueeze(0)
+        print("########source_tensor", source_tensor)
 
         sources_mask = pad_masking(source_tensor, source_tensor.size(1))
         memory_mask = pad_masking(source_tensor, 1)
+        print("########sources_mask", sources_mask)
+        print("########memory_mask", memory_mask)
         memory = self.model.encoder(source_tensor, sources_mask)
 
         decoder_state = self.model.decoder.init_decoder_state()
@@ -80,18 +83,22 @@ if __name__ == "__main__":
     config = get_config('Predict translation', logger=logger)
 
     logger.info('Constructing dictionaries...')
-    source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
-    target_dictionary = IndexDictionary.load(config['data_dir'], mode='target', vocabulary_size=config['vocabulary_size'])
+    source_dictionary = IndexDictionary.load(config['data_dir'], mode='source',
+                                             vocabulary_size=config['vocabulary_size'])
+    target_dictionary = IndexDictionary.load(config['data_dir'], mode='target',
+                                             vocabulary_size=config['vocabulary_size'])
 
     logger.info('Building model...')
     model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
     predictor = Predictor(
         preprocess=IndexedInputTargetTranslationDataset.preprocess(source_dictionary),
-        postprocess=lambda x: ' '.join([token for token in target_dictionary.tokenify_indexes(x) if token != '<EndSent>']),
+        postprocess=lambda x: ' '.join([token for token in target_dictionary.tokenify_indexes(x)
+                                        if token != '<EndSent>']),
         model=model,
-        checkpoint_filepath=config["checkpoint"]
+        checkpoint_filepath=config["save_checkpoint"]
     )
 
-    for index, candidate in enumerate(predictor.predict_one(config["source"], num_candidates=config["num_candidates"])):
+    for index, candidate in enumerate(predictor.predict_one(config["source"],
+                                                            num_candidates=config["num_candidates"])):
         logger.info(f'Candidate {index} : {candidate}')

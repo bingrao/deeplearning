@@ -5,9 +5,10 @@ import torch
 
 def get_config(desc='Train Transformer', logger=None):
     parser = ArgumentParser(description=desc)
+
     # Prediction
     parser.add_argument('--source', type=str)
-    parser.add_argument('--config', type=str, default=None)
+    # parser.add_argument('--config', type=str, default=None)
     parser.add_argument('--checkpoint', type=str, default=None)
     parser.add_argument('--num_candidates', type=int, default=3)
 
@@ -24,9 +25,7 @@ def get_config(desc='Train Transformer', logger=None):
     parser.add_argument('--share_dictionary', type=bool, default=False)
 
     # Train
-    parser.add_argument('--data_dir', type=str, default=None)
     parser.add_argument('--save_config', type=str, default=None)
-    parser.add_argument('--save_checkpoint', type=str, default=None)
     parser.add_argument('--save_log', type=str, default=None)
 
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -40,8 +39,8 @@ def get_config(desc='Train Transformer', logger=None):
     parser.add_argument('--positional_encoding', action='store_true')
 
     parser.add_argument('--d_model', type=int, default=16)
-    parser.add_argument('--layers_count', type=int, default=2)
-    parser.add_argument('--heads_count', type=int, default=4)
+    parser.add_argument('--layers_count', type=int, default=1)
+    parser.add_argument('--heads_count', type=int, default=2)
     parser.add_argument('--d_ff', type=int, default=32)
     parser.add_argument('--dropout_prob', type=float, default=0.1)
 
@@ -55,17 +54,17 @@ def get_config(desc='Train Transformer', logger=None):
 
     args = parser.parse_args()
 
-    if args.config is not None:
-        with open(args.config) as f:
-            config = json.load(f)
-
-        default_config = vars(args)
-        for key, default_value in default_config.items():
-            if key not in config:
-                config[key] = default_value
-    else:
-        config = vars(args)  # convert to dictionary
-
+    # if args.config is not None:
+    #     with open(args.config) as f:
+    #         config = json.load(f)
+    #
+    #     default_config = vars(args)
+    #     for key, default_value in default_config.items():
+    #         if key not in config:
+    #             config[key] = default_value
+    # else:
+    #     config = vars(args)  # convert to dictionary
+    config = vars(args)  # convert to dictionary
     if logger is None:
         output = print
     else:

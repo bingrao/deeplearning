@@ -17,5 +17,5 @@ python ${Src_Dir}/evaluate.py --train_source=${src_train_path} \
                               --val_target=${tgt_val_path} \
                               --save_data_dir=${Data_Processed} \
                               --save_result=logs/example_eval.txt \
-                              --config=checkpoints/example_config.json \
-                              --checkpoint=checkpoints/example_model.pth
+                              --save_config=${Data_Checkpoint}/example_config.json \
+                              --checkpoint=${Data_Checkpoint}/example_model.pth

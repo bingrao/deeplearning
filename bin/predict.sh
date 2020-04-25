@@ -17,5 +17,4 @@ python ${Src_Dir}/predict.py --train_source=${src_train_path} \
                              --val_target=${tgt_val_path} \
                              --save_data_dir=${Data_Processed} \
                              --source="There is an imbalance here ." \
-                             --config=checkpoints/example_config.json \
-                             --checkpoint=checkpoints/example_model.pth
+                             --checkpoint=${Data_Checkpoint}/example_model.pth
