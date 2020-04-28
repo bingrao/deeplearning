@@ -1,13 +1,11 @@
-from predict import Predictor
-from models import build_model
-from datasets import TranslationDataset
-from datasets import IndexedInputTargetTranslationDataset
-from dictionaries import IndexDictionary
+from nmt.predict import Predictor
+from nmt.model import build_model
+from nmt.data.datasets import TranslationDataset
+from nmt.data import IndexDictionary
 from datetime import datetime
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 from tqdm import tqdm
-from utils.argument import get_config
-from utils.context import Context
+from nmt.utils.context import Context
 
 
 class Evaluator:

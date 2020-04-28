@@ -13,7 +13,7 @@ class Beam:
         self.top_sentence_ended = False
 
         self.prev_ks = []
-        self.next_ys = [torch.LongTensor(beam_size).fill_(start_token_id)] # remove padding
+        self.next_ys = [torch.LongTensor(beam_size).fill_(start_token_id)]  # remove padding
 
         self.current_scores = torch.FloatTensor(beam_size).zero_()
         self.all_scores = []
@@ -75,11 +75,11 @@ class Beam:
             self.top_sentence_ended = True
 
     def get_current_state(self):
-        "Get the outputs for the current timestep."
+        """Get the outputs for the current timestep."""
         return self.next_ys[-1]
 
     def get_current_origin(self):
-        "Get the backpointers for the current timestep."
+        """Get the backpointers for the current timestep."""
         return self.prev_ks[-1]
 
     def done(self):

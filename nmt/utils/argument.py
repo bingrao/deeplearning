@@ -4,6 +4,14 @@ import torch
 
 def get_config(desc='Train Transformer'):
     parser = ArgumentParser(description=desc)
+    # Command Project Related Parameters
+    parser.add_argument('--project_name', type=str)
+    parser.add_argument('--project_raw_dir', type=str)
+    parser.add_argument('--project_processed_dir', type=str)
+    parser.add_argument('--project_config', type=str)
+    parser.add_argument('--project_log', type=str)
+    parser.add_argument('--project_checkpoint', type=str)
+    parser.add_argument('--phase', type=str, default='val', choices=['train', 'val'])
 
     # Prediction
     parser.add_argument('--source', type=str)
@@ -12,20 +20,9 @@ def get_config(desc='Train Transformer'):
 
     # Evalation
     parser.add_argument('--save_result', type=str, default=None)
-    parser.add_argument('--phase', type=str, default='val', choices=['train', 'val'])
-
-    # Preparing Dataset
-    parser.add_argument('--train_source', type=str, default=None)
-    parser.add_argument('--train_target', type=str, default=None)
-    parser.add_argument('--val_source', type=str, default=None)
-    parser.add_argument('--val_target', type=str, default=None)
-    parser.add_argument('--save_data_dir', type=str, default=None)
     parser.add_argument('--share_dictionary', type=bool, default=False)
 
     # Train
-    parser.add_argument('--save_config', type=str, default=None)
-    parser.add_argument('--save_log', type=str, default=None)
-
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--gpu_idx', type=str, default=[0])
 
@@ -33,13 +30,13 @@ def get_config(desc='Train Transformer'):
     parser.add_argument('--print_every', type=int, default=1)
     parser.add_argument('--save_every', type=int, default=1)
 
+    # Model Parameters
     parser.add_argument('--vocabulary_size', type=int, default=None)
     parser.add_argument('--positional_encoding', action='store_true')
-
-    parser.add_argument('--d_model', type=int, default=16)
+    parser.add_argument('--d_model', type=int, default=128)
     parser.add_argument('--layers_count', type=int, default=1)
     parser.add_argument('--heads_count', type=int, default=2)
-    parser.add_argument('--d_ff', type=int, default=32)
+    parser.add_argument('--d_ff', type=int, default=1)
     parser.add_argument('--dropout_prob', type=float, default=0.1)
 
     parser.add_argument('--label_smoothing', type=float, default=0.1)

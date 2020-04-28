@@ -1,6 +1,10 @@
 #!/bin/bash
-export Project_Home=`pwd`/..
-export Data_Path=${Project_Home}\data
+# Root envs
+export RootPath=`pwd`
+export PYTHONPATH=${PYTHONPATH}:${RootPath}
+RootSrc=${RootPath}/nmt
+RootData=${RootPath}/data
+CurrentDate=$(date +%F)
 # load conda virtual environment
 
 conda activate transformer_pytorch

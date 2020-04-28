@@ -29,11 +29,11 @@ class LabelSmoothingLoss(nn.Module):
     KL-divergence between q_{smoothed ground truth prob.}(w)
     and p_{prob. computed by model}(w) is minimized.
     """
-    def __init__(self, label_smoothing, vocabulary_size, pad_index=0):
+    def __init__(self, ctx, label_smoothing, vocabulary_size, pad_index=0):
         assert 0.0 < label_smoothing <= 1.0
-
         super(LabelSmoothingLoss, self).__init__()
-
+        self.context = ctx
+        self.generator = nn.Linear(self.context.config["d_model"], vocabulary_size)
         self.pad_index = pad_index
         self.log_softmax = nn.LogSoftmax(dim=-1)
         self.criterion = nn.KLDivLoss(reduction='sum')
@@ -50,6 +50,7 @@ class LabelSmoothingLoss(nn.Module):
         outputs (FloatTensor): (batch_size, seq_len, vocabulary_size)
         targets (LongTensor): (batch_size, seq_len)
         """
+        outputs = self.generator(outputs)
         batch_size, seq_len, vocabulary_size = outputs.size()
 
         outputs_log_softmax = self.log_softmax(outputs)
@@ -73,7 +74,6 @@ class LabelSmoothingLoss(nn.Module):
 
 class SimpleLossCompute:
     """A simple loss compute and train function."""
-
     def __init__(self, generator, criterion, opt=None):
         self.generator = generator
         self.criterion = criterion
@@ -87,4 +87,6 @@ class SimpleLossCompute:
         if self.opt is not None:
             self.opt.step()
             self.opt.optimizer.zero_grad()
-        return loss.data[0] * norm
+        # https://github.com/pytorch/pytorch/issues/15585
+        # return loss.data[0] * norm
+        return loss.data.item() * norm

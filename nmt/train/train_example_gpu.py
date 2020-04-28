@@ -1,21 +1,20 @@
-from datasets import IndexedInputTargetTranslationDataset
-from dictionaries import IndexDictionary
-from losses import TokenCrossEntropyLoss, LabelSmoothingLoss
-from metrics import AccuracyMetric
-from optimizers import NoamOptimizer
-from utils.pipe import input_target_collate_fn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 import random
 from tqdm import tqdm
-from os.path import join, exists
-from os import makedirs
+from os.path import join
 from datetime import datetime
-import json
+import os
 import numpy as np
 import torch
-from models import build_model
-from utils.context import Context
+from nmt.data.datasets import IndexedInputTargetTranslationDataset
+from nmt.data.dictionaries import IndexDictionary
+from nmt.train.losses import TokenCrossEntropyLoss, LabelSmoothingLoss
+from nmt.metric.metrics import AccuracyMetric
+from nmt.train.optimizers import NoamOptimizer
+from nmt.utils.pipe import input_target_collate_fn
+from nmt.model.transformer.model import build_model
+from nmt.utils.context import Context, create_dir
 
 
 class TransformerTrainer:
@@ -30,8 +29,10 @@ class TransformerTrainer:
                  ctx):
 
         self.config = ctx.config
+        self.logger = ctx.logger
+        self.proj_processed_dir = ctx.config["project_processed_dir"]
+
         self.device = torch.device(self.config['device'])
-        self.save_data_dir = self.config["save_data_dir"]
         self.run_name = run_name
         self.model = model.to(self.device)
         self.train_dataloader = train_dataloader
@@ -42,19 +43,10 @@ class TransformerTrainer:
         self.optimizer = optimizer
         self.clip_grads = self.config['clip_grads']
 
-        self.logger = ctx.logger
-        self.checkpoint_dir = join(self.save_data_dir, 'checkpoints', run_name)
 
-        if not exists(self.checkpoint_dir):
-            makedirs(self.checkpoint_dir)
-
-        if self.config["save_config"] is None:
-            config_filepath = join(self.save_data_dir, 'checkpoints','config.json')
-        else:
-            config_filepath = self.config["save_config"]
-
-        with open(config_filepath, 'w') as config_file:
-            json.dump(self.config, config_file)
+        self.checkpoint = self.config["project_checkpoint"]
+        self.checkpoint_dir = join(os.path.dirname(self.config["project_raw_dir"]),'checkpoints', run_name)
+        create_dir(self.checkpoint_dir)
 
         self.print_every = self.config['print_every']
         self.save_every = self.config['save_every']
@@ -67,7 +59,7 @@ class TransformerTrainer:
         self.best_val_metric = None
         self.best_checkpoint_filepath = None
 
-        self.checkpoint = self.config["checkpoint"]
+
         self.save_format = 'epoch={epoch:0>3}-val_loss={val_loss:<.3}-val_metrics={val_metrics}.pth'
 
         self.log_format = (
@@ -87,8 +79,7 @@ class TransformerTrainer:
         batch_metrics = []
         for sources, inputs, targets in tqdm(dataloader):
             sources, inputs, targets = sources.to(self.device), inputs.to(self.device), targets.to(self.device)
-            outputs = self.model.forward(sources, inputs)
-
+            outputs = self.model(sources, inputs)
             batch_loss, batch_count = self.loss_function(outputs, targets)
 
             if mode == 'train':
@@ -212,11 +203,11 @@ def run_trainer_standalone(ctx):
     logger.info(config)
 
     logger.info('Constructing dictionaries...')
-    source_dictionary = IndexDictionary.load(config['save_data_dir'], mode='source',
+    source_dictionary = IndexDictionary.load(ctx.config["project_processed_dir"], mode='source',
                                              vocabulary_size=config['vocabulary_size'])
     logger.info(f'Source dictionary vocabulary Size: {source_dictionary.vocabulary_size} tokens')
 
-    target_dictionary = IndexDictionary.load(config['save_data_dir'], mode='target',
+    target_dictionary = IndexDictionary.load(ctx.config["project_processed_dir"], mode='target',
                                              vocabulary_size=config['vocabulary_size'])
     logger.info(f'Target dictionary vocabulary Size: {target_dictionary.vocabulary_size} tokens')
 
@@ -248,7 +239,7 @@ def run_trainer_standalone(ctx):
         collate_fn=input_target_collate_fn)
 
     if config['label_smoothing'] > 0.0:
-        loss_function = LabelSmoothingLoss(label_smoothing=config['label_smoothing'],
+        loss_function = LabelSmoothingLoss(ctx=ctx, label_smoothing=config['label_smoothing'],
                                            vocabulary_size=target_dictionary.vocabulary_size)
     else:
         loss_function = TokenCrossEntropyLoss()
@@ -280,4 +271,4 @@ def run_trainer_standalone(ctx):
 
 
 if __name__ == '__main__':
-    run_trainer_standalone(Context(desc="Train"))
+    run_trainer_standalone(Context(desc="Train Example Project with GPU Resource!"))
