@@ -58,7 +58,7 @@ case ${model} in
   ;;
   "train")
       set -x
-      python "${RootSrc}"/train/train_spacy_gpu.py \
+      python "${RootSrc}"/train/train_spacy.py \
                                       --project_name="${ProjectName}" \
                                       --project_raw_data="${ProjectRawDataDir}" \
                                       --project_processed_data="${ProjectProcessedDataDir}" \

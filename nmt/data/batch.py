@@ -1,7 +1,7 @@
 from torch.autograd import Variable
 from nmt.utils.pad import subsequent_mask
 import time
-import logging
+from tqdm import tqdm
 global max_src_in_batch, max_tgt_in_batch
 
 
@@ -44,13 +44,13 @@ def rebatch(pad_idx, batch):
     return Batch(src, trg, pad_idx)
 
 
-def run_epoch(data_iter, model, loss_compute):
+def run_epoch(data_iter, model, loss_compute, ctx):
     """Standard Training and Logging Function"""
     start = time.time()
     total_tokens = 0
     total_loss = 0
     tokens = 0
-    for i, batch in enumerate(data_iter):
+    for i, batch in tqdm(enumerate(data_iter)):
         out = model(batch.src, batch.trg, batch.src_mask, batch.trg_mask)
         loss = loss_compute(out, batch.trg_y, batch.ntokens)
         total_loss += loss
@@ -58,8 +58,8 @@ def run_epoch(data_iter, model, loss_compute):
         tokens += batch.ntokens
         if i % 50 == 1:
             elapsed = time.time() - start
-            print("#####Epoch Step: %d Loss: %f Tokens per Sec: %f" %
-                  (i, loss / batch.ntokens, tokens / elapsed))
+            ctx.logger.info("Epoch Step: %d Loss: %f Tokens per Sec: %f",
+                            i, loss / batch.ntokens, tokens / elapsed)
             start = time.time()
             tokens = 0
     return total_loss / total_tokens

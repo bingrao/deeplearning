@@ -16,7 +16,7 @@ CurrentDate=$(date +%F)
 
 
 # Project envs
-ProjectName="example"
+ProjectName="spacy"
 ProjectData=${RootData}/${ProjectName}
 ProjectRawDataDir=${ProjectData}/raw
 ProjectProcessedDataDir=${ProjectData}/processed
@@ -37,17 +37,18 @@ case ${model} in
   ;;
   "train")
       set -x
-      python "${RootSrc}"/train/train_example_gpu.py \
+      python "${RootSrc}"/train/train_${ProjectName}.py \
                                       --project_name="${ProjectName}" \
                                       --project_raw_dir="${ProjectRawDataDir}" \
                                       --project_processed_dir="${ProjectProcessedDataDir}" \
                                       --project_config="${ProjectConfig}" \
                                       --project_log="${ProjectLog}" \
-                                      --project_checkpoint="${ProjectCheckpoint}"
+                                      --project_checkpoint="${ProjectCheckpoint}" \
+                                      --device='cpu'
   ;;
   "predict")
       set -x
-      python "${RootSrc}"/predict/predict.py \
+      python "${RootSrc}"/predict/predict_${ProjectName}.py \
                               --project_name="${ProjectName}" \
                               --project_raw_dir="${ProjectRawDataDir}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \
@@ -58,7 +59,7 @@ case ${model} in
   ;;
   "val")
       set -x
-      python "${RootSrc}"/evaluate/evaluate.py \
+      python "${RootSrc}"/evaluate/evaluate_${ProjectName}.py \
                               --project_name="${ProjectName}" \
                               --project_raw_dir="${ProjectRawDataDir}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \

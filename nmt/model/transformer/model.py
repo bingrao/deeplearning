@@ -3,7 +3,8 @@ import copy
 from nmt.data.embeddings import Embeddings, PositionalEncoding
 from nmt.model.transformer.encoder import Encoder, EncoderLayer
 from nmt.model.transformer.decoder import Decoder, DecoderLayer
-from nmt.model.common import MultiHeadedAttention, PositionwiseFeedForward, Generator, MultiHeadAttention
+from nmt.model.common import PositionwiseFeedForward, Generator
+from nmt.model.attention import MultiHeadedAttention
 
 
 class Transformer(nn.Module):
@@ -19,47 +20,35 @@ class Transformer(nn.Module):
     def encode(self, src, src_mask):
         src_embed = self.src_embed(src)
         output = self.encoder(src_embed, src_mask)
-        self.context.logger.debug("[%s-Encode] The Source, src_embed, output dimension: %s, %s, %s",
-                                  self.__class__.__name__,
-                                  src.size(),
-                                  src_embed.size(),
-                                  output.size())
+        self.context.logger.debug("[%s-Encode] The Source %s, src_embed %s, output %s dimension",
+                                  self.__class__.__name__, src.size(), src_embed.size(), output.size())
         return output
 
     def decode(self, tgt, memory, memory_mask, tgt_mask):
         tgt_embed = self.tgt_embed(tgt)
         output = self.decoder(tgt_embed, memory, memory_mask, tgt_mask)
-        self.context.logger.debug("[%s-Decode] The tgt, tgt_embed, memory, output dimension: %s, %s, %s, %s",
-                                  self.__class__.__name__,
-                                  tgt.size(),
-                                  tgt_embed.size(),
-                                  memory.size(),
-                                  output.size())
+        self.context.logger.debug("[%s-Decode] The tgt %s, tgt_embed %s, memory %s, output %s dimension",
+                                  self.__class__.__name__, tgt.size(), tgt_embed.size(), memory.size(), output.size())
         return output
 
     def forward(self, src, tgt, src_mask=None, tgt_mask=None):
-        # batch_size, sources_len = src.size()
-        # batch_size, inputs_len = tgt.size()
-
-        """
-        RuntimeError: CUDA out of memory. Tried to allocate 68.05 GiB 
-        (GPU 0; 15.75 GiB total capacity; 10.36 GiB already allocated; 
-        4.35 GiB free; 10.43 GiB reserved in total by PyTorch)
-        """
-        # if src_mask is None:
-        #     src_mask = pad_masking(src, sources_len)
-        #     memory_mask = pad_masking(src, inputs_len)
-        # else:
-        #     memory_mask = src_mask
-        # if tgt_mask is None:
-        #     tgt_mask = subsequent_masking(tgt) | pad_masking(tgt, inputs_len)
+        # Create mask for src tgt and memory if not provided by user
+        from nmt.utils.pad import pad_masking, subsequent_masking
+        batch_size, sources_len = src.size()
+        batch_size, inputs_len = tgt.size()
+        if src_mask is None:
+            src_mask = pad_masking(src, sources_len)
+            memory_mask = pad_masking(src, inputs_len)
+        else:
+            memory_mask = src_mask
+        if tgt_mask is None:
+            tgt_mask = subsequent_masking(tgt) | pad_masking(tgt, inputs_len)
 
         # Get encoder output, (batch_size, seq_len, d_model)
-
-
         memory = self.encode(src, src_mask)  # Context Vectors
+
         # Get decoder output, (batch_size, seq_len, d_model)
-        outputs = self.decode(tgt, memory, src_mask, tgt_mask)
+        outputs = self.decode(tgt, memory, memory_mask, tgt_mask)
         return outputs
 
 
@@ -74,28 +63,9 @@ def build_model(ctx, src_vocab_size, tgt_vocab_size):
     d_ff = config['d_ff']  # d_ff=2048,
     h = config['heads_count']  # h=8,
     dropout = config['dropout_prob']  # dropout=0.1
-    attn = MultiHeadAttention(h, d_model, dropout)
-    # attn = MultiHeadedAttention(ctx, h, d_model)
+    attn = MultiHeadedAttention(ctx, h, d_model)
     ff = PositionwiseFeedForward(ctx, d_model, d_ff, dropout)
     position = PositionalEncoding(ctx, d_model, dropout)
-
-    # from nmt.data.embeddings import PositionalEncodingDebug
-    # if config['positional_encoding']:
-    #     source_embedding = PositionalEncodingDebug(
-    #         num_embeddings=src_vocab_size,
-    #         embedding_dim=config['d_model'],
-    #         dim=config['d_model'])  # why dim?
-    #     target_embedding = PositionalEncodingDebug(
-    #         num_embeddings=tgt_vocab_size,
-    #         embedding_dim=config['d_model'],
-    #         dim=config['d_model'])  # why dim?
-    # else:
-    #     source_embedding = nn.Embedding(
-    #         num_embeddings=src_vocab_size,
-    #         embedding_dim=config['d_model'])
-    #     target_embedding = nn.Embedding(
-    #         num_embeddings=tgt_vocab_size,
-    #         embedding_dim=config['d_model'])
 
     model = Transformer(ctx=ctx,
                         encoder=Encoder(ctx,

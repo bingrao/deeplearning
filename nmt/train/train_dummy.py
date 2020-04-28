@@ -34,8 +34,14 @@ if __name__ == "__main__":
 	for epoch in range(100):
 		logger.info("Training Epoch %d", epoch)
 		model.train()
-		run_epoch(data_gen(vocab_size, 30, 20), model, SimpleLossCompute(model.generator, criterion, model_opt))
+		run_epoch(data_gen(vocab_size, 30, 20),
+				  model,
+				  SimpleLossCompute(model.generator, criterion, model_opt),
+				  ctx)
 
 		logger.info("Evaluating Epoch %d", epoch)
 		model.eval()
-		logger.info(run_epoch(data_gen(vocab_size, 30, 5), model, SimpleLossCompute(model.generator, criterion, None)))
+		logger.info(run_epoch(data_gen(vocab_size, 30, 5),
+							  model,
+							  SimpleLossCompute(model.generator, criterion, None),
+							  ctx))

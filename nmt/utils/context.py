@@ -3,6 +3,7 @@ from nmt.utils.log import get_logger
 from os.path import join, exists
 from os import makedirs
 import os
+import torch
 
 
 def create_dir(dir_path):
@@ -56,3 +57,8 @@ class Context:
 		for key, val in self.config.items():
 			self.logger.info(f"{key} => {val}")
 
+		self.device = torch.device(self.config["device"])
+		self.device_id = list(self.config["device_id"])
+		self.is_cuda = self.config["device"] == 'cuda'
+		self.is_cpu = self.config["device"] == 'cpu'
+		self.is_gpu_parallel = self.is_cuda and (len(self.device_id) > 1)

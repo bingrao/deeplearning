@@ -24,7 +24,7 @@ def get_config(desc='Train Transformer'):
 
     # Train
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
-    parser.add_argument('--gpu_idx', type=str, default=[0])
+    parser.add_argument('--device_id', type=list, default=[0])
 
     parser.add_argument('--dataset_limit', type=int, default=None)
     parser.add_argument('--print_every', type=int, default=1)
