@@ -37,7 +37,7 @@ def get_config(desc='Train Transformer'):
     parser.add_argument('--layers_count', type=int, default=1)
     parser.add_argument('--heads_count', type=int, default=2)
     parser.add_argument('--d_ff', type=int, default=1)
-    parser.add_argument('--dropout_prob', type=float, default=0.1)
+    parser.add_argument('--dropout', type=float, default=0.1)
 
     parser.add_argument('--label_smoothing', type=float, default=0.1)
     parser.add_argument('--optimizer', type=str, default="Adam", choices=["Noam", "Adam"])

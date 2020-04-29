@@ -27,7 +27,7 @@ def gen_raw_data(ctx, phase):
     with open(tgt_dir) as target_file:
         target_data = target_file.readlines()
 
-    with open(join(ctx.proj_processed_dir, f'raw-{phase}.txt'), 'w') as file:
+    with open(join(ctx.project_processed_dir, f'raw-{phase}.txt'), 'w') as file:
         for source_line, target_line in zip(source_data, target_data):
             source_line = source_line.strip()
             target_line = target_line.strip()
@@ -43,11 +43,10 @@ class TranslationDataset:
         assert phase in ('train', 'val'), "Dataset phase must be either 'train' or 'val'"
         self.context = ctx
         self.logger = ctx.logger
-        self.config = ctx.config
 
         self.limit = limit
         self.phase = phase
-        self.raw_data_path = join(self.config["project_processed_dir"], f'raw-{phase}.txt')
+        self.raw_data_path = join(self.context.project_processed_dir, f'raw-{phase}.txt')
         self.data = []
 
         # Raw dataset does not exist, and then create
@@ -55,7 +54,7 @@ class TranslationDataset:
             gen_raw_data(ctx=self.context, phase=self.phase)
 
         # Append (src,tgt) to self.data
-        with open(join(self.config["project_processed_dir"], f'raw-{phase}.txt')) as file:
+        with open(join(self.context.project_processed_dir, f'raw-{phase}.txt')) as file:
             for line in file:
                 source, target = line.strip().split('\t')
                 self.data.append((source, target))
@@ -92,7 +91,6 @@ class TranslationDatasetOnTheFly:
         assert phase in ('train', 'val'), "Dataset phase must be either 'train' or 'val'"
         self.context = ctx
         self.limit = limit
-        self.config = ctx.config
         self.logger = ctx.logger
 
         if phase == 'train':
@@ -131,7 +129,6 @@ class TokenizedTranslationDatasetOnTheFly:
     """
     def __init__(self, ctx, phase, limit=None):
         self.context = ctx
-        self.config = ctx.config
         self.logger = ctx.logger
         self.raw_dataset = TranslationDatasetOnTheFly(ctx, phase, limit)
 
@@ -152,7 +149,6 @@ class TokenizedTranslationDataset:
         - tokenized_target: a list of token in an item of train/val target dataset
     """
     def __init__(self, ctx, phase, limit=None):
-        self.config = ctx.config
         self.logger = ctx.logger
         self.raw_dataset = TranslationDataset(ctx, phase, limit)
 
@@ -266,18 +262,17 @@ class IndexedInputTargetTranslationDataset(torch.utils.data.Dataset):
         self.context = ctx
         # [(indexed_sources, indexed_inputs, indexed_targets), (indexed_sources, indexed_inputs, indexed_targets)]
         self.data = []
-        self.config = ctx.config
         self.phase = phase
-        self.index_path = join(self.config["project_processed_dir"], f'indexed-{phase}.txt')
-        self.vocabulary_size = self.config["vocabulary_size"]
-        self.limit = self.config["dataset_limit"]
+        self.index_path = join(ctx.project_processed_dir, f'indexed-{phase}.txt')
+        self.vocabulary_size = ctx.vocabulary_size
+        self.limit = ctx.dataset_limit
 
         if not exists(self.index_path):
             # source vocabulary dictionary
-            src_dictionary = IndexDictionary.load(self.config["project_processed_dir"], mode='source')
+            src_dictionary = IndexDictionary.load(ctx.project_processed_dir, mode='source')
 
             # target vocabulary dictionary
-            tgt_dictionary = IndexDictionary.load(self.config["project_processed_dir"], mode='target')
+            tgt_dictionary = IndexDictionary.load(ctx.project_processed_dir, mode='target')
 
             def join_indexes(indexes):
                 return ' '.join(str(index) for index in indexes)
@@ -342,11 +337,11 @@ class IndexedInputTargetTranslationDataset(torch.utils.data.Dataset):
 
         if src_dictionary is None:
             # source vocabulary dictionary
-            src_dictionary = IndexDictionary.load(ctx.config["project_processed_dir"], mode='source')
+            src_dictionary = IndexDictionary.load(ctx.project_processed_dir, mode='source')
 
         if tgt_dictionary is None:
             # target vocabulary dictionary
-            tgt_dictionary = IndexDictionary.load(ctx.config["project_processed_dir"], mode='target')
+            tgt_dictionary = IndexDictionary.load(ctx.project_processed_dir, mode='target')
 
         def join_indexes(indexes):
             return ' '.join(str(index) for index in indexes)
@@ -354,7 +349,7 @@ class IndexedInputTargetTranslationDataset(torch.utils.data.Dataset):
         for phase in ('train', 'val'):
             input_target_dataset = InputTargetTranslationDataset(ctx, phase)
 
-            with open(join(ctx.config["project_processed_dir"], f'indexed-{phase}.txt'), 'w') as file:
+            with open(join(ctx.project_processed_dir, f'indexed-{phase}.txt'), 'w') as file:
                 for sources, inputs, targets in input_target_dataset:
                     indexed_sources = join_indexes(src_dictionary.index_sentence(sources))
                     indexed_inputs = join_indexes(tgt_dictionary.index_sentence(inputs))
@@ -365,7 +360,6 @@ class IndexedInputTargetTranslationDataset(torch.utils.data.Dataset):
 if __name__ == "__main__":
     context = Context(desc="dataset")
     logger = context.logger
-    config = context.config
 
     if logger.isEnabledFor(logging.DEBUG):
         # Preparing Raw train/val dataset: a file of each line (src, tgt)
@@ -392,35 +386,35 @@ if __name__ == "__main__":
     tokenized_dataset = TokenizedTranslationDataset(context, 'train')
 
     logger.info("The source and target vocabulary dictionaries are generating and saving ...")
-    if config["share_dictionary"]:
+    if context.share_dictionary:
         source_generator = shared_tokens_generator(tokenized_dataset)
         source_dictionary = IndexDictionary(source_generator, mode='source')
         # Save source vocabulary
-        source_dictionary.save(config["project_processed_dir"])
+        source_dictionary.save(context.project_processed_dir)
 
         target_generator = shared_tokens_generator(tokenized_dataset)
         target_dictionary = IndexDictionary(target_generator, mode='target')
         # Save target vocabulary
-        target_dictionary.save(config["project_processed_dir"])
+        target_dictionary.save(context.project_processed_dir)
     else:
         source_generator = source_tokens_generator(tokenized_dataset)
         source_dictionary = IndexDictionary(source_generator, mode='source')
         # Save source vocabulary
-        source_dictionary.save(config["project_processed_dir"])
+        source_dictionary.save(context.project_processed_dir)
 
         target_generator = target_tokens_generator(tokenized_dataset)
         target_dictionary = IndexDictionary(target_generator, mode='target')
         # Save target vocabulary
-        target_dictionary.save(config["project_processed_dir"])
+        target_dictionary.save(context.project_processed_dir)
 
     if logger.isEnabledFor(logging.DEBUG):
         # source vocabulary dictionary
         logger.debug("Loading Source Dictionary from vocabulary-source.txt")
-        source_dictionary = IndexDictionary.load(config["project_processed_dir"], mode='source')
+        source_dictionary = IndexDictionary.load(context.project_processed_dir, mode='source')
 
         # target vocabulary dictionary
         logger.debug("Loading Target Dictionary from vocabulary-target.txt")
-        target_dictionary = IndexDictionary.load(config["project_processed_dir"], mode='target')
+        target_dictionary = IndexDictionary.load(context.project_processed_dir, mode='target')
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.info("Convert tokens into index for train/validate datasets ...")

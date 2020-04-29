@@ -55,5 +55,5 @@ class NoamOpt:
 
 
 def get_std_opt(model):
-    return NoamOpt(model.config["d_model"], 2, 4000,
+    return NoamOpt(model.context.d_model, 2, 4000,
                    torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))

@@ -28,11 +28,10 @@ class TransformerTrainer:
                  run_name,          # String Name
                  ctx):
 
-        self.config = ctx.config
         self.logger = ctx.logger
-        self.proj_processed_dir = ctx.config["project_processed_dir"]
+        self.proj_processed_dir = ctx.project_processed_dir
 
-        self.device = torch.device(self.config['device'])
+        self.device = ctx.device
         self.run_name = run_name
         self.model = model.to(self.device)
         self.train_dataloader = train_dataloader
@@ -41,15 +40,15 @@ class TransformerTrainer:
         self.loss_function = loss_function.to(self.device)
         self.metric_function = metric_function
         self.optimizer = optimizer
-        self.clip_grads = self.config['clip_grads']
+        self.clip_grads = ctx.clip_grads
 
 
-        self.checkpoint = self.config["project_checkpoint"]
-        self.checkpoint_dir = join(os.path.dirname(self.config["project_raw_dir"]),'checkpoints', run_name)
+        self.checkpoint = ctx.project_checkpoint
+        self.checkpoint_dir = join(os.path.dirname(ctx.project_raw_dir),'checkpoints', run_name)
         create_dir(self.checkpoint_dir)
 
-        self.print_every = self.config['print_every']
-        self.save_every = self.config['save_every']
+        self.print_every = ctx.print_every
+        self.save_every = ctx.save_every
 
         self.epoch = 0
         self.history = []
@@ -187,7 +186,6 @@ def run_trainer_standalone(ctx):
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
-    config = ctx.config
     logger = ctx.logger
 
     run_name = (
@@ -197,18 +195,16 @@ def run_trainer_standalone(ctx):
         "pe={positional_encoding}-"
         "optimizer={optimizer}-"
         "{timestamp}"
-    ).format(**config, timestamp=datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+    ).format(**ctx.config, timestamp=datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
 
     logger.info(f'Run name : {run_name}')
-    logger.info(config)
-
     logger.info('Constructing dictionaries...')
-    source_dictionary = IndexDictionary.load(ctx.config["project_processed_dir"], mode='source',
-                                             vocabulary_size=config['vocabulary_size'])
+    source_dictionary = IndexDictionary.load(ctx.project_processed_dir, mode='source',
+                                             vocabulary_size=ctx.vocabulary_size)
     logger.info(f'Source dictionary vocabulary Size: {source_dictionary.vocabulary_size} tokens')
 
-    target_dictionary = IndexDictionary.load(ctx.config["project_processed_dir"], mode='target',
-                                             vocabulary_size=config['vocabulary_size'])
+    target_dictionary = IndexDictionary.load(ctx.project_processed_dir, mode='target',
+                                             vocabulary_size=ctx.vocabulary_size)
     logger.info(f'Target dictionary vocabulary Size: {target_dictionary.vocabulary_size} tokens')
 
     logger.info('Building model...')
@@ -229,27 +225,27 @@ def run_trainer_standalone(ctx):
 
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=config['batch_size'],
+        batch_size=ctx.batch_size,
         shuffle=True,
         collate_fn=input_target_collate_fn)
 
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=config['batch_size'],
+        batch_size=ctx.batch_size,
         collate_fn=input_target_collate_fn)
 
-    if config['label_smoothing'] > 0.0:
-        loss_function = LabelSmoothingLoss(ctx=ctx, label_smoothing=config['label_smoothing'],
+    if ctx.label_smoothing > 0.0:
+        loss_function = LabelSmoothingLoss(ctx=ctx, label_smoothing=ctx.label_smoothing,
                                            vocabulary_size=target_dictionary.vocabulary_size)
     else:
         loss_function = TokenCrossEntropyLoss()
 
     accuracy_function = AccuracyMetric()
 
-    if config['optimizer'] == 'Noam':
-        optimizer = NoamOptimizer(model.parameters(), d_model=config['d_model'])
-    elif config['optimizer'] == 'Adam':
-        optimizer = Adam(model.parameters(), lr=config['lr'])
+    if ctx.optimizer == 'Noam':
+        optimizer = NoamOptimizer(model.parameters(), d_model=ctx.d_model)
+    elif ctx.optimizer == 'Adam':
+        optimizer = Adam(model.parameters(), lr=ctx.lr)
     else:
         raise NotImplementedError()
 
@@ -265,7 +261,7 @@ def run_trainer_standalone(ctx):
         ctx=ctx
     )
 
-    trainer.run(config['epochs'])
+    trainer.run(ctx.epochs)
 
     return trainer
 

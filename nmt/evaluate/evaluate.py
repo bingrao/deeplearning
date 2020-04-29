@@ -48,25 +48,28 @@ class Evaluator:
 if __name__ == "__main__":
 
     context = Context("Evaluation")
-    config = context.config
     logger = context.logger
 
     logger.info('Constructing dictionaries...')
-    source_dictionary = IndexDictionary.load(config['data_dir'], mode='source', vocabulary_size=config['vocabulary_size'])
-    target_dictionary = IndexDictionary.load(config['data_dir'], mode='target', vocabulary_size=config['vocabulary_size'])
+    source_dictionary = IndexDictionary.load(context.proj_processed_dir,
+                                             mode='source',
+                                             vocabulary_size=context.vocabulary_size)
+    target_dictionary = IndexDictionary.load(context.proj_processed_dir,
+                                             mode='target',
+                                             vocabulary_size=context.vocabulary_size)
 
     logger.info('Building model...')
-    model = build_model(config, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
+    model = build_model(context, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
     predictor = Predictor(ctx=context, m=model, src_dictionary=source_dictionary, tgt_dictionary=target_dictionary)
 
     timestamp = datetime.now()
-    if config["save_result"] is None:
-        eval_filepath = 'logs/eval-{config}-time={timestamp}.csv'.format(
-            config=config["config"].replace('/', '-'),
+    if context.save_result is None:
+        eval_filepath = 'logs/eval-{cfg}-time={timestamp}.csv'.format(
+            cfg=context.project_config.replace('/', '-'),
             timestamp=timestamp.strftime("%Y_%m_%d_%H_%M_%S"))
     else:
-        eval_filepath = config["save_result"]
+        eval_filepath = context.save_result
 
     evaluator = Evaluator(
         predictor=predictor,
@@ -74,7 +77,7 @@ if __name__ == "__main__":
     )
 
     logger.info('Evaluating...')
-    test_dataset = TranslationDataset(config, config["phase"], limit=1000)
+    test_dataset = TranslationDataset(context, context.phase, limit=1000)
     bleu_score = evaluator.evaluate_dataset(test_dataset)
     logger.info('Evaluation time :', datetime.now() - timestamp)
 

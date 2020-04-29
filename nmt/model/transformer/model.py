@@ -57,12 +57,11 @@ def build_model(ctx, src_vocab_size, tgt_vocab_size):
     Helper: Construct a model from hyperparameters.
     """
     c = copy.deepcopy
-    config = ctx.config
-    N = config['layers_count']  # N=6,
-    d_model = config['d_model']  # d_model=512,
-    d_ff = config['d_ff']  # d_ff=2048,
-    h = config['heads_count']  # h=8,
-    dropout = config['dropout_prob']  # dropout=0.1
+    N = ctx.layers_count  # N=6,
+    d_model = ctx.d_model  # d_model=512,
+    d_ff = ctx.d_ff  # d_ff=2048,
+    h = ctx.heads_count  # h=8,
+    dropout = ctx.dropout  # dropout=0.1
     attn = MultiHeadedAttention(ctx, h, d_model)
     ff = PositionwiseFeedForward(ctx, d_model, d_ff, dropout)
     position = PositionalEncoding(ctx, d_model, dropout)

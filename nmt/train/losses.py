@@ -34,7 +34,7 @@ class LabelSmoothingLoss(nn.Module):
         assert 0.0 < label_smoothing <= 1.0
         super(LabelSmoothingLoss, self).__init__()
         self.context = ctx
-        self.generator = nn.Linear(self.context.config["d_model"], vocabulary_size)
+        self.generator = nn.Linear(self.context.d_model, vocabulary_size)
         self.pad_index = pad_index
         self.log_softmax = nn.LogSoftmax(dim=-1)
         self.criterion = nn.KLDivLoss(reduction='sum')

@@ -9,7 +9,6 @@ from nmt.utils.context import Context
 class Predictor:
     def __init__(self, ctx, m, src_dictionary, tgt_dictionary, max_length=30, beam_size=8):
         self.context = ctx
-        self.config = ctx.config
         self.logger = ctx.logger
         self.model = m
         self.source_dictionary = src_dictionary
@@ -25,30 +24,28 @@ class Predictor:
         self.attentions = None
         self.hypothesises = None
         self.model.eval()
-        self.checkpoint_filepath = self.config["checkpoint"]
+        self.checkpoint_filepath = self.context.project_checkpoint
         self.model.load_state_dict(torch.load(self.checkpoint_filepath, map_location='cpu'))
 
 
     def predict_one(self, source=None, num_candidates=None):
+        source = self.context.source if source is None else None
+        num_candidates = self.context.num_candidates if num_candidates is None else None
 
-        if source is None:
-            source = self.config["source"]
-        if num_candidates is None:
-            num_candidates = self.config["num_candidates"]
 
-        self.logger.info("########Source: %s", str(source))
+        self.logger.debug("########Source: %s", str(source))
         source_preprocessed = self.preprocess(source)
-        self.logger.info("########source_preprocessed: %s", str(source_preprocessed))
+        self.logger.debug("########source_preprocessed: %s", str(source_preprocessed))
 
         source_tensor = torch.tensor(source_preprocessed).unsqueeze(0)  # why unsqueeze?
         length_tensor = torch.tensor(len(source_preprocessed)).unsqueeze(0)
-        self.logger.info("########source_tensor: %s", str(source_tensor))
+        self.logger.debug("########source_tensor: %s", str(source_tensor))
 
         # sources_mask = pad_masking(source_tensor, source_tensor.size(1))
         sources_mask = (source_tensor != 0).unsqueeze(-2)
 
         memory = self.model.encode(source_tensor, sources_mask)
-        self.logger.info("#########Encoder Result(Memory): %s", memory)
+        self.logger.debug("#########Encoder Result(Memory): %s", memory)
         memory_mask = sources_mask
 
         decoder_state = self.model.decoder.init_decoder_state()
@@ -106,13 +103,12 @@ if __name__ == "__main__":
 
     context = Context(desc="Prediction")
     logger = context.logger
-    config = context.config
 
     logger.info('Constructing dictionaries...')
-    source_dictionary = IndexDictionary.load(config['save_data_dir'], mode='source',
-                                             vocabulary_size=config['vocabulary_size'])
-    target_dictionary = IndexDictionary.load(config['save_data_dir'], mode='target',
-                                             vocabulary_size=config['vocabulary_size'])
+    source_dictionary = IndexDictionary.load(context.proj_processed_dir, mode='source',
+                                             vocabulary_size=context.vocabulary_size)
+    target_dictionary = IndexDictionary.load(context.proj_processed_dir, mode='target',
+                                             vocabulary_size=context.vocabulary_size)
 
     logger.info('Building model...')
     model = build_model(context, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)

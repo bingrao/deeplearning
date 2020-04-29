@@ -1,11 +1,15 @@
 #!/bin/bash
 
-if [ "$#" -ne 1 ] ; then
+if [ "$#" -ne 2 ] ; then
   echo "Missing Parameters ..."
-  echo "Usage: $0 model[dataset|train|predict|val]" >&2
+  echo "Usage: $0 project[dummy|example|spacy] model[dataset|train|predict|val] " >&2
   exit 1
 fi
-model=$1
+#ProjectName="spacy"
+#ProjectName="dummy"
+#ProjectName="example"
+ProjectName=$1
+model=$2
 
 # Root envs
 export RootPath=`pwd`
@@ -16,7 +20,6 @@ CurrentDate=$(date +%F)
 
 
 # Project envs
-ProjectName="spacy"
 ProjectData=${RootData}/${ProjectName}
 ProjectRawDataDir=${ProjectData}/raw
 ProjectProcessedDataDir=${ProjectData}/processed
@@ -44,7 +47,8 @@ case ${model} in
                                       --project_config="${ProjectConfig}" \
                                       --project_log="${ProjectLog}" \
                                       --project_checkpoint="${ProjectCheckpoint}" \
-                                      --device='cpu'
+                                      --device='cuda'
+
   ;;
   "predict")
       set -x
@@ -70,7 +74,7 @@ case ${model} in
   ;;
    *)
      echo "There is no match case for ${model}"
-     echo "Usage: $0 model[dataset|model|predict|valuate]" >&2
+     echo "Usage: $0 project[dummy|example|spacy] model[dataset|train|predict|val] " >&2
      exit 1
   ;;
 esac

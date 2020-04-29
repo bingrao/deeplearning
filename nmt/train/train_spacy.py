@@ -42,10 +42,9 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
 
 if __name__ == "__main__":
     ctx = Context("Train_MultiGPU")
-    config = ctx.config
     logger = ctx.logger
-    BATCH_SIZE = config["batch_size"]
-    epochs = config["epochs"]
+    nums_batch = ctx.batch_size
+    epochs = ctx.epochs
 
     # For data loading.
     from torchtext import data, datasets
@@ -57,8 +56,8 @@ if __name__ == "__main__":
     # !python -m spacy download de
 
     logger.info("Load en/de data from local ...")
-    spacy_de = spacy.load('de', path=ctx.proj_raw_dir)
-    spacy_en = spacy.load('en', path=ctx.proj_raw_dir)
+    spacy_de = spacy.load('de', path=ctx.project_raw_dir)
+    spacy_en = spacy.load('en', path=ctx.project_raw_dir)
 
 
     def tokenize_de(text):
@@ -82,7 +81,7 @@ if __name__ == "__main__":
     train, val, test = datasets.IWSLT.splits(
         exts=('.de', '.en'),  # A tuple containing the extension to path for each language.
         fields=(SRC, TGT),  # A tuple containing the fields that will be used for data in each language.
-        root=ctx.proj_raw_dir,  # Root dataset storage directory.
+        root=ctx.project_raw_dir,  # Root dataset storage directory.
         # train='train',  # The prefix of the train data.
         # validation='val',  # The prefix of the validation data
         # test='test',  # The prefix of the test data. Default
@@ -98,21 +97,20 @@ if __name__ == "__main__":
     pad_idx = TGT.vocab.stoi["<blank>"]
     logger.info("Build Model ...")
     model = build_model(ctx, len(SRC.vocab), len(TGT.vocab))
+    model.cuda() if ctx.is_cuda else None
 
     # Print out log info for debug ...
     logger.info(model)
 
-    if ctx.is_cuda:
-        model.cuda()
+
     criterion = LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
-    if ctx.is_cuda:
-        criterion.cuda()
+    criterion.cuda() if ctx.is_cuda else None
 
     logger.info("Generating Training and Validating Batch datasets ...")
-    train_iter = MyIterator(train, batch_size=BATCH_SIZE, device=ctx.device,
+    train_iter = MyIterator(train, batch_size=nums_batch, device=ctx.device,
                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                             batch_size_fn=batch_size_fn, train=True)
-    valid_iter = MyIterator(val, batch_size=BATCH_SIZE, device=ctx.device,
+    valid_iter = MyIterator(val, batch_size=nums_batch, device=ctx.device,
                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                             batch_size_fn=batch_size_fn, train=False)
 
