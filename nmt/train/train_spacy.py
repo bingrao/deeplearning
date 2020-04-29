@@ -1,43 +1,28 @@
-from torch.autograd import Variable
 import torch
+from torch.autograd import Variable
 from torch import nn
 from nmt.model.transformer.model import build_model
 from nmt.utils.context import Context
 from nmt.train.common import LabelSmoothing
 from nmt.data.batch import batch_size_fn, run_epoch, rebatch
 from nmt.utils.pad import subsequent_mask
-from nmt.train.optimizers import NoamOpt
 from nmt.data.preprocess import MyIterator
-from nmt.train.losses import SimpleLossCompute, MultiGPULossCompute
+from nmt.train.common import SimpleLossCompute, MultiGPULossCompute, NoamOpt
 
 
-def greedy_decode(model, src, src_mask, max_len, start_symbol):
-    memory = model.encode(src, src_mask)
-    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
-    for i in range(max_len - 1):
-        out = model.decode(memory, src_mask,
+def greedy_decode(model_, src_, src_mask_, max_len, start_symbol):
+    memory = model_.encode(src_, src_mask_)
+    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src_.data)
+    for idx in range(max_len - 1):
+        out_ = model_.decode(memory, src_mask_,
                            Variable(ys),
                            Variable(subsequent_mask(ys.size(1))
-                                    .type_as(src.data)))
-        prob = model.generator(out[:, -1])
+                                    .type_as(src_.data)))
+        prob = model_.generator(out_[:, -1])
         _, next_word = torch.max(prob, dim=1)
         next_word = next_word.data[0]
-        ys = torch.cat([ys,
-                        torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
+        ys = torch.cat([ys, torch.ones(1, 1).type_as(src_.data).fill_(next_word)], dim=1)
     return ys
-
-
-# Finally to really target fast training, we will use multi-gpu.
-# This code implements multi-gpu word generation. It is not specific to
-# transformer so I won’t go into too much detail. The idea is to split up
-# word generation at training time into chunks to be processed in parallel
-# across many different gpus. We do this using pytorch parallel primitives:
-
-# replicate - split modules onto different gpus.
-# scatter - split batches onto different gpus
-# parallel_apply - apply module to batches on different gpus
-# gather - pull scattered data back onto one gpu.
-# nn.DataParallel - a special module wrapper that calls these all before evaluating.
 
 
 if __name__ == "__main__":

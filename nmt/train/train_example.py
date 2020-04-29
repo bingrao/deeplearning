@@ -1,4 +1,3 @@
-from torch.optim import Adam
 from torch.utils.data import DataLoader
 import random
 from tqdm import tqdm
@@ -9,12 +8,104 @@ import numpy as np
 import torch
 from nmt.data.datasets import IndexedInputTargetTranslationDataset
 from nmt.data.dictionaries import IndexDictionary
-from nmt.train.losses import TokenCrossEntropyLoss, LabelSmoothingLoss
 from nmt.metric.metrics import AccuracyMetric
-from nmt.train.optimizers import NoamOptimizer
 from nmt.utils.pipe import input_target_collate_fn
 from nmt.model.transformer.model import build_model
 from nmt.utils.context import Context, create_dir
+from torch.optim import Adam
+
+
+class NoamOptimizer(Adam):
+
+    def __init__(self, params, d_model, factor=2, warmup_steps=4000, betas=(0.9, 0.98), eps=1e-9):
+        # self.optimizer = Adam(params, betas=betas, eps=eps)
+        self.d_model = d_model
+        self.warmup_steps = warmup_steps
+        self.lr = 0
+        self.step_num = 0
+        self.factor = factor
+        super(NoamOptimizer, self).__init__(params, betas=betas, eps=eps)
+
+    def step(self, closure=None):
+        self.step_num += 1
+        self.lr = self.lrate()
+        for group in self.param_groups:
+            group['lr'] = self.lr
+        super(NoamOptimizer, self).step()
+
+    def lrate(self):
+        return self.factor * self.d_model ** (-0.5) * min(self.step_num ** (-0.5), self.step_num * self.warmup_steps ** (-1.5))
+
+
+
+class TokenCrossEntropyLoss(nn.Module):
+
+    def __init__(self, pad_index=0):
+        super(TokenCrossEntropyLoss, self).__init__()
+
+        self.pad_index = pad_index
+        self.base_loss_function = nn.CrossEntropyLoss(reduction='sum', ignore_index=pad_index)
+
+    def forward(self, outputs, targets):
+        batch_size, seq_len, vocabulary_size = outputs.size()
+
+        outputs_flat = outputs.view(batch_size * seq_len, vocabulary_size)
+        targets_flat = targets.view(batch_size * seq_len)
+
+        batch_loss = self.base_loss_function(outputs_flat, targets_flat)
+
+        count = (targets != self.pad_index).sum().item()
+
+        return batch_loss, count
+
+
+class LabelSmoothingLoss(nn.Module):
+    """
+    With label smoothing,
+    KL-divergence between q_{smoothed ground truth prob.}(w)
+    and p_{prob. computed by model}(w) is minimized.
+    """
+    def __init__(self, ctx, label_smoothing, vocabulary_size, pad_index=0):
+        assert 0.0 < label_smoothing <= 1.0
+        super(LabelSmoothingLoss, self).__init__()
+        self.context = ctx
+        self.generator = nn.Linear(self.context.d_model, vocabulary_size)
+        self.pad_index = pad_index
+        self.log_softmax = nn.LogSoftmax(dim=-1)
+        self.criterion = nn.KLDivLoss(reduction='sum')
+
+        smoothing_value = label_smoothing / (vocabulary_size - 2)  # exclude pad and true label
+        smoothed_targets = torch.full((vocabulary_size,), smoothing_value)
+        smoothed_targets[self.pad_index] = 0
+        self.register_buffer('smoothed_targets', smoothed_targets.unsqueeze(0))  # (1, vocabulary_size)
+
+        self.confidence = 1.0 - label_smoothing
+
+    def forward(self, outputs, targets):
+        """
+        outputs (FloatTensor): (batch_size, seq_len, vocabulary_size)
+        targets (LongTensor): (batch_size, seq_len)
+        """
+        outputs = self.generator(outputs)
+        batch_size, seq_len, vocabulary_size = outputs.size()
+
+        outputs_log_softmax = self.log_softmax(outputs)
+        outputs_flat = outputs_log_softmax.view(batch_size * seq_len, vocabulary_size)
+        targets_flat = targets.view(batch_size * seq_len)
+
+        smoothed_targets = self.smoothed_targets.repeat(targets_flat.size(0), 1)
+        # smoothed_targets: (batch_size * seq_len, vocabulary_size)
+
+        smoothed_targets.scatter_(1, targets_flat.unsqueeze(1), self.confidence)
+        # smoothed_targets: (batch_size * seq_len, vocabulary_size)
+
+        smoothed_targets.masked_fill_((targets_flat == self.pad_index).unsqueeze(1), 0)
+        # masked_targets: (batch_size * seq_len, vocabulary_size)
+
+        loss = self.criterion(outputs_flat, smoothed_targets)
+        count = (targets != self.pad_index).sum().item()
+
+        return loss, count
 
 
 class TransformerTrainer:
