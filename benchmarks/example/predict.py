@@ -4,7 +4,8 @@ from nmt.model.transformer.model import build_model
 from benchmarks.example.datasets import IndexedInputTargetTranslationDataset, IndexDictionary
 from benchmarks.beam import Beam
 from nmt.utils.context import Context
-from nmt.utils.pad import subsequent_mask
+from nmt.utils.pad import subsequent_mask, pad_masking, subsequent_masking
+
 
 
 def make_std_mask(tgt, pad):
@@ -23,8 +24,15 @@ class Predictor:
         self.source_dictionary = src_dictionary
         self.target_dictionary = tgt_dictionary
 
+        # Get a list index number of a given input string based on source dictionary.
+        # Input: a input string
+        # output: a corresponding index list
         self.preprocess = IndexedInputTargetTranslationDataset.preprocess(self.source_dictionary)
 
+        # Get a output string by converting a list of index based
+        # on target dictionary to a corresponding output string
+        # Input: an index list
+        # output: a corresponding output string
         self.postprocess = lambda x: ' '.join(
             [token for token in self.target_dictionary.tokenify_indexes(x) if token != '<EndSent>'])
 
@@ -32,66 +40,72 @@ class Predictor:
         self.beam_size = beam_size
         self.attentions = None
         self.hypothesises = None
+
+        # Set up evaluate model
         self.model.eval()
-        self.checkpoint_filepath = self.context.project_checkpoint
-        self.model.load_state_dict(torch.load(self.checkpoint_filepath, map_location='cpu'))
+        # Loading model paramters from previous traning.
+        if self.context.project_checkpoint is not None:
+            self.checkpoint_filepath = self.context.project_checkpoint
+            self.model.load_state_dict(torch.load(self.checkpoint_filepath, map_location='cpu'))
+        else:
+            self.context.logger.error("[%s] There is no module paramters input and please train it",
+                                      self.__class__.__name__,)
+            exit(-1)
 
 
     def predict_one(self, source=None, num_candidates=None):
         source = self.context.source if source is None else None
         num_candidates = self.context.num_candidates if num_candidates is None else None
+        self.logger.debug("[%s] Predict Input Source: %s, nums of Candidates %d", self.__class__.__name__,
+                          str(source), num_candidates)
 
-
-        self.logger.debug("########Source: %s", str(source))
         source_preprocessed = self.preprocess(source)
-        self.logger.debug("########source_preprocessed: %s", str(source_preprocessed))
+        self.logger.debug("[%s] The corresponding indexes of [%s]: %s", self.__class__.__name__,
+                          str(source), str(source_preprocessed))
 
         source_tensor = torch.tensor(source_preprocessed).unsqueeze(0)  # why unsqueeze?
         length_tensor = torch.tensor(len(source_preprocessed)).unsqueeze(0)
-        self.logger.debug("########source_tensor: %s", str(source_tensor))
+        self.logger.debug("[%s] The index source Tensor: %s, lenght %s", self.__class__.__name__,
+                          source_tensor, length_tensor)
 
-        # sources_mask = pad_masking(source_tensor, source_tensor.size(1))
-        sources_mask = (source_tensor != 0).unsqueeze(-2)
-
+        sources_mask = pad_masking(source_tensor, source_tensor.size(1))
         memory = self.model.encode(source_tensor, sources_mask)
-        self.logger.debug("#########Encoder Result(Memory): %s", memory)
+
+        self.logger.debug("[%s] Encoder Source %s, Output %s dimensions", self.__class__.__name__,
+                          source_tensor.size(), memory.size())
+
         memory_mask = sources_mask
 
-        decoder_state = self.model.decoder.init_decoder_state()
-
-        # self.logger.info('decoder_state src: %s', decoder_state.src.shape)
-        # self.logger.info('previous_input previous_input: %s', decoder_state.previous_input)
-        # self.logger.info('previous_input previous_layer_inputs: %s ', decoder_state.previous_layer_inputs)
-
-
         # Repeat beam_size times
-        memory_beam = memory.detach().repeat(self.beam_size, 1, 1)  # (beam_size, seq_len, hidden_size)
-        self.logger.info("#########Encoder Result(Memory Beam): %s", memory_beam)
+        # (beam_size, seq_len, hidden_size)
+        memory_beam = memory.detach().repeat(self.beam_size, 1, 1)
 
-        beam = Beam(beam_size=self.beam_size, min_length=0, n_top=num_candidates, ranker=None)
+        self.logger.debug("[%s] Memory %s dimension", self.__class__.__name__, memory_beam.shape())
+
+        beam = Beam(ctx=self.context,
+                    beam_size=self.beam_size,
+                    min_length=0,
+                    n_top=num_candidates,
+                    ranker=None)
 
         for _ in range(self.max_length):
 
             new_inputs = beam.get_current_state().unsqueeze(1)  # (beam_size, seq_len=1)
             # new_mask = subsequent_masking(new_inputs)
-            new_mask = make_std_mask(new_inputs, 0)
-            self.logger.info("#########Encoder Input: %s", new_inputs)
-            decoder_outputs, decoder_state = self.model.decode(tgt=new_inputs,
-                                                               memory=memory_beam,
-                                                               memory_mask=memory_mask,
-                                                               tgt_mask=new_mask,
-                                                               state=decoder_state)
+            new_mask = subsequent_masking(new_inputs) | pad_masking(new_inputs, new_inputs.size(1))
 
-            self.logger.info("#########Decoder Result: %s", decoder_outputs)
-            # decoder_outputs: (beam_size, target_seq_len=1, vocabulary_size)
-            # attentions['std']: (target_seq_len=1, beam_size, source_seq_len)
+            decoder_outputs = self.model.decode(tgt=new_inputs,
+                                                memory=memory_beam,
+                                                memory_mask=memory_mask,
+                                                tgt_mask=new_mask)
+
+            self.logger.debug("[%s] Decoder Input %s, output %s dimensions",
+                             self.__class__.__name__, new_inputs.size(), decoder_outputs.size())
 
             attention = self.model.decoder.layers[-1].src_attn.attention
+            self.logger.debug("[%s] attention %s dimension", attention.size())
+
             beam.advance(decoder_outputs.squeeze(1), attention)
-
-            beam_current_origin = beam.get_current_origin()  # (beam_size, )
-            decoder_state.beam_update(beam_current_origin)
-
             if beam.done():
                 break
 
@@ -121,8 +135,12 @@ if __name__ == "__main__":
 
     logger.info('Building model...')
     model = build_model(context, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
+
     logger.info("Building Predictor ....")
-    predictor = Predictor(ctx=context,m=model,src_dictionary=source_dictionary, tgt_dictionary=target_dictionary)
+    predictor = Predictor(ctx=context,
+                          m=model,
+                          src_dictionary=source_dictionary,
+                          tgt_dictionary=target_dictionary)
 
     logger.info("Get Predict Result ...")
     for index, candidate in enumerate(predictor.predict_one()):

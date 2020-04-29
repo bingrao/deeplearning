@@ -5,16 +5,16 @@ import torch
 def get_config(desc='Train Transformer'):
     parser = ArgumentParser(description=desc)
     # Command Project Related Parameters
-    parser.add_argument('--project_name', type=str)
-    parser.add_argument('--project_raw_dir', type=str)
-    parser.add_argument('--project_processed_dir', type=str)
-    parser.add_argument('--project_config', type=str)
-    parser.add_argument('--project_log', type=str)
-    parser.add_argument('--project_checkpoint', type=str)
-    parser.add_argument('--phase', type=str, default='val', choices=['train', 'val'])
+    parser.add_argument('--project_name', type=str, default=None)
+    parser.add_argument('--project_raw_dir', type=str, default=None)
+    parser.add_argument('--project_processed_dir', type=str, default=None)
+    parser.add_argument('--project_config', type=str, default=None)
+    parser.add_argument('--project_log', type=str, default=None)
+    parser.add_argument('--project_checkpoint', type=str, default=None)
+    parser.add_argument('--phase', type=str, choices=['train', 'val'], default='val')
 
     # Prediction
-    parser.add_argument('--source', type=str)
+    parser.add_argument('--source', type=str, default="I am a chinese.")
     parser.add_argument('--checkpoint', type=str, default=None)
     parser.add_argument('--num_candidates', type=int, default=3)
 

@@ -8,9 +8,9 @@ from nmt.utils.context import Context
 
 
 class Evaluator:
-    def __init__(self, predictor, save_filepath):
+    def __init__(self, pred=None, save_filepath=None):
 
-        self.predictor = predictor
+        self.predictor = pred
         self.save_filepath = save_filepath
 
     def evaluate_dataset(self, test_dataset):
@@ -29,7 +29,8 @@ class Evaluator:
         with open(self.save_filepath, 'w') as file:
             for (source, target), prediction, hypothesis, references in zip(test_dataset, predictions,
                                                                             hypotheses, list_of_references):
-                sentence_bleu_score = sentence_bleu(references, hypothesis,
+                sentence_bleu_score = sentence_bleu(references,
+                                                    hypothesis,
                                                     smoothing_function=smoothing_function.method3)
                 line = "{bleu_score}\t{source}\t{target}\t|\t{prediction}".format(
                     bleu_score=sentence_bleu_score,
@@ -39,9 +40,7 @@ class Evaluator:
                 )
                 file.write(line + '\n')
 
-        bleu_score = corpus_bleu(list_of_references, hypotheses, smoothing_function=smoothing_function.method3)
-
-        return bleu_score
+        return corpus_bleu(list_of_references, hypotheses, smoothing_function=smoothing_function.method3)
 
 
 if __name__ == "__main__":
@@ -60,7 +59,10 @@ if __name__ == "__main__":
     logger.info('Building model...')
     model = build_model(context, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
 
-    predictor = Predictor(ctx=context, m=model, src_dictionary=source_dictionary, tgt_dictionary=target_dictionary)
+    predictor = Predictor(ctx=context,
+                          m=model,
+                          src_dictionary=source_dictionary,
+                          tgt_dictionary=target_dictionary)
 
     timestamp = datetime.now()
     if context.save_result is None:
@@ -70,14 +72,10 @@ if __name__ == "__main__":
     else:
         eval_filepath = context.save_result
 
-    evaluator = Evaluator(
-        predictor=predictor,
-        save_filepath=eval_filepath
-    )
+    evaluator = Evaluator(pred=predictor, save_filepath=eval_filepath)
 
     logger.info('Evaluating...')
-    test_dataset = TranslationDataset(context, context.phase, limit=1000)
-    bleu_score = evaluator.evaluate_dataset(test_dataset)
+    test_datasets = TranslationDataset(context, context.phase, limit=1000)
+    bleu_score = evaluator.evaluate_dataset(test_datasets)
     logger.info('Evaluation time :', datetime.now() - timestamp)
-
     logger.info("BLEU score :", bleu_score)

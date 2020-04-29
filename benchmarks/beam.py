@@ -2,9 +2,9 @@ import torch
 
 
 class Beam:
-
-    def __init__(self, beam_size=8, min_length=0, n_top=1, ranker=None,
+    def __init__(self, ctx=None, beam_size=8, min_length=0, n_top=1, ranker=None,
                  start_token_id=2, end_token_id=3):
+        self.context = ctx
         self.beam_size = beam_size
         self.min_length = min_length
         self.ranker = ranker
@@ -61,8 +61,10 @@ class Beam:
 
         self.prev_ks.append(prev_k)
         self.next_ys.append(next_y)
+
         # for RNN, dim=1 and for transformer, dim=0.
-        prev_attention = current_attention.index_select(dim=0, index=prev_k)  # (target_seq_len=1, beam_size, source_seq_len)
+        # (target_seq_len=1, beam_size, source_seq_len)
+        prev_attention = current_attention.index_select(dim=0, index=prev_k)
         self.all_attentions.append(prev_attention)
 
 

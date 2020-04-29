@@ -68,7 +68,7 @@ case ${model} in
                               --project_config="${ProjectConfig}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}" \
-                              --save_result=logs/example_eval.txt
+                              --save_result="${ProjectData}"/${ProjectName}_eval.txt
   ;;
    *)
      echo "There is no match case for ${model}"
