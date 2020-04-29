@@ -5,7 +5,7 @@ from datetime import datetime
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 from tqdm import tqdm
 from nmt.utils.context import Context
-
+import os
 
 class Evaluator:
     def __init__(self, pred=None, save_filepath=None):
@@ -55,6 +55,7 @@ if __name__ == "__main__":
     target_dictionary = IndexDictionary.load(context.proj_processed_dir,
                                              mode='target',
                                              vocabulary_size=context.vocabulary_size)
+    
 
     logger.info('Building model...')
     model = build_model(context, source_dictionary.vocabulary_size, target_dictionary.vocabulary_size)
@@ -66,8 +67,9 @@ if __name__ == "__main__":
 
     timestamp = datetime.now()
     if context.save_result is None:
-        eval_filepath = 'logs/eval-{cfg}-time={timestamp}.csv'.format(
-            cfg=context.project_config.replace('/', '-'),
+        eval_filepath = '{logs_dir}/eval-{cfg}-time={timestamp}.csv'.format(
+            logs_dir=os.path.dirname(context.project_log),
+            cfg=context.proj_name,
             timestamp=timestamp.strftime("%Y_%m_%d_%H_%M_%S"))
     else:
         eval_filepath = context.save_result

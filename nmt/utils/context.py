@@ -4,6 +4,7 @@ from os.path import join, exists
 from os import makedirs
 import os
 import torch
+import json
 
 
 def create_dir(dir_path):
@@ -35,6 +36,7 @@ class Context:
 		self.project_config = self.config["project_config"]
 		if not exists(self.project_config):
 			create_dir(os.path.dirname(self.project_config))
+		self.project_save_config = self.config["project_save_config"]
 
 		self.project_log = self.config["project_log"]
 		if not exists(self.project_log):
@@ -81,6 +83,11 @@ class Context:
 		self.is_cpu = self.config["device"] == 'cpu'
 		self.is_gpu_parallel = self.is_cuda and (len(self.device_id) > 1)
 
-		self.logger.info("The Input Parameters:")
+		self.logger.debug("The Input Parameters:")
 		for key, val in self.config.items():
-			self.logger.info(f"{key} => {val}")
+			self.logger.debug(f"{key} => {val}")
+
+		if self.project_save_config is True:
+			config_filepath = join(os.path.dirname(self.project_log), f'${self.proj_name}_save_config.json')
+			with open(config_filepath, 'w') as config_file:
+				json.dump(self.config, config_file)

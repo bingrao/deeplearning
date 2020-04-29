@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 import torch
+import json
 
 
 def get_config(desc='Train Transformer'):
@@ -9,6 +10,7 @@ def get_config(desc='Train Transformer'):
     parser.add_argument('--project_raw_dir', type=str, default=None)
     parser.add_argument('--project_processed_dir', type=str, default=None)
     parser.add_argument('--project_config', type=str, default=None)
+    parser.add_argument('--project_save_config', type=bool, default=True)
     parser.add_argument('--project_log', type=str, default=None)
     parser.add_argument('--project_checkpoint', type=str, default=None)
     parser.add_argument('--phase', type=str, choices=['train', 'val'], default='val')
@@ -47,4 +49,17 @@ def get_config(desc='Train Transformer'):
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=100)
 
-    return vars(parser.parse_args())  # convert to dictionary
+    args = parser.parse_args()
+
+    if args.project_log is not None:
+        with open(args.project_log) as f:
+            config = json.load(f)
+
+        default_config = vars(args)
+        for key, default_value in default_config.items():
+            if key not in config:
+                config[key] = default_value
+    else:
+        config = vars(args)  # convert to dictionary
+
+    return config
