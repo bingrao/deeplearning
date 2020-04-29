@@ -48,6 +48,7 @@ class Context:
 
 		# logger interface
 		self.logger = get_logger(self.description, self.project_log) if logger is None else logger
+		self.logger.debug("The logger interface is initited ...")
 
 		# Model Paramters
 		self.phase = self.config["phase"]
@@ -89,5 +90,6 @@ class Context:
 
 		if self.project_save_config is True:
 			config_filepath = join(os.path.dirname(self.project_log), f'${self.proj_name}_save_config.json')
+			self.logger.debug(f"Dump project configration to the file {config_filepath} ...")
 			with open(config_filepath, 'w') as config_file:
 				json.dump(self.config, config_file)

@@ -32,7 +32,6 @@ case ${model} in
                               --project_name="${ProjectName}" \
                               --project_raw_dir="${ProjectRawDataDir}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \
-#                              --project_config="${ProjectConfig}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}"
   ;;
@@ -42,7 +41,6 @@ case ${model} in
                                       --project_name="${ProjectName}" \
                                       --project_raw_dir="${ProjectRawDataDir}" \
                                       --project_processed_dir="${ProjectProcessedDataDir}" \
-#                                      --project_config="${ProjectConfig}" \
                                       --project_log="${ProjectLog}" \
                                       --project_checkpoint="${ProjectCheckpoint}" \
                                       --device='cuda'
@@ -54,7 +52,6 @@ case ${model} in
                               --project_name="${ProjectName}" \
                               --project_raw_dir="${ProjectRawDataDir}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \
-#                              --project_config="${ProjectConfig}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}" \
                               --source="There is an imbalance here ."
@@ -65,7 +62,6 @@ case ${model} in
                               --project_name="${ProjectName}" \
                               --project_raw_dir="${ProjectRawDataDir}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \
-#                              --project_config="${ProjectConfig}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}" \
                               --save_result="${ProjectData}"/${ProjectName}_eval.txt

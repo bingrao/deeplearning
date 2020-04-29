@@ -52,13 +52,16 @@ def get_config(desc='Train Transformer'):
     args = parser.parse_args()
 
     if args.project_log is not None:
-        with open(args.project_log) as f:
-            config = json.load(f)
-
-        default_config = vars(args)
-        for key, default_value in default_config.items():
-            if key not in config:
-                config[key] = default_value
+        if exit(args.project_log):
+            with open(args.project_log) as f:
+                config = json.load(f)
+            default_config = vars(args)
+            for key, default_value in default_config.items():
+                if key not in config:
+                    config[key] = default_value
+        else:
+            print("The project log config is configured but not provided ...")
+            exit(-1)
     else:
         config = vars(args)  # convert to dictionary
 
