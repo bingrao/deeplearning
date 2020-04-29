@@ -2,7 +2,7 @@
 
 if [ "$#" -ne 2 ] ; then
   echo "Missing Parameters ..."
-  echo "Usage: $0 project[dummy|example|spacy] model[dataset|train|predict|val] " >&2
+  echo "Usage: $0 project[dummy|example|spacy] model[preprocess|train|predict|val] " >&2
   exit 1
 fi
 #ProjectName="spacy"
@@ -14,7 +14,6 @@ model=$2
 # Root envs
 export RootPath=`pwd`
 export PYTHONPATH=${PYTHONPATH}:${RootPath}
-RootSrc=${RootPath}/nmt
 CurrentDate=$(date +%F)
 ProjectBechmarks=${RootPath}/benchmarks/${ProjectName}
 ProjectData=${RootPath}/data/${ProjectName}
@@ -27,7 +26,7 @@ ProjectLog=${ProjectData}/logs/${ProjectName}-${model}.log
 ProjectCheckpoint=${ProjectData}/checkpoints/${CurrentDate}-${ProjectName}-model.pth
 
 case ${model} in
-  "dataset")
+  "preprocess")
       set -x
       python "${ProjectBechmarks}"/preprocess.py \
                               --project_name="${ProjectName}" \
@@ -73,7 +72,7 @@ case ${model} in
   ;;
    *)
      echo "There is no match case for ${model}"
-     echo "Usage: $0 project[dummy|example|spacy] model[dataset|train|predict|val] " >&2
+     echo "Usage: $0 project[dummy|example|spacy] model[preprocess|train|predict|val] " >&2
      exit 1
   ;;
 esac
