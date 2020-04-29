@@ -5,44 +5,60 @@ if [ "$#" -ne 2 ] ; then
   echo "Usage: $0 project[dummy|example|spacy] model[preprocess|train|predict|val] " >&2
   exit 1
 fi
+CurrentDate=$(date +%F)
+
 #ProjectName="spacy"
 #ProjectName="dummy"
 #ProjectName="example"
 ProjectName=$1
+
+# preprocess|train|predict|val
 model=$2
 
 # Root envs
 export RootPath=`pwd`
 export PYTHONPATH=${PYTHONPATH}:${RootPath}
-CurrentDate=$(date +%F)
+
 ProjectBechmarks=${RootPath}/benchmarks/${ProjectName}
-ProjectData=${RootPath}/data/${ProjectName}
+
 
 # Project envs
-ProjectRawDataDir=${ProjectData}/raw
-ProjectProcessedDataDir=${ProjectData}/processed
-ProjectConfig=${ProjectData}/configs/${ProjectName}_config.json
-ProjectLog=${ProjectData}/logs/${ProjectName}-${model}.log
-ProjectCheckpoint=${ProjectData}/checkpoints/${CurrentDate}-${ProjectName}-model.pth
+ProjectData=${ProjectBechmarks}/data
+
+# Processed data folder to save intermediate data
+ProjectProcessedDataDir=${ProjectBechmarks}/processed
+
+# Default config file
+ProjectConfig=${ProjectBechmarks}/configs/default_config.json
+
+# Default logs file
+ProjectLog=${ProjectBechmarks}/logs/${model}-${CurrentDate}.log
+
+# Default Checkpoint file
+ProjectCheckpoint=${ProjectBechmarks}/checkpoints/checkpoint-${model}-${CurrentDate}.pth
 
 case ${model} in
   "preprocess")
       set -x
       python "${ProjectBechmarks}"/preprocess.py \
                               --project_name="${ProjectName}" \
-                              --project_raw_dir="${ProjectRawDataDir}" \
+                              --project_config="${ProjectConfig}" \
+                              --project_raw_dir="${ProjectData}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \
                               --project_log="${ProjectLog}" \
-                              --project_checkpoint="${ProjectCheckpoint}"
+                              --project_checkpoint="${ProjectCheckpoint}" \
+                              --phase="${model}"
   ;;
   "train")
       set -x
       python "${ProjectBechmarks}"/train.py \
                                       --project_name="${ProjectName}" \
-                                      --project_raw_dir="${ProjectRawDataDir}" \
+                                      --project_config="${ProjectConfig}" \
+                                      --project_raw_dir="${ProjectData}" \
                                       --project_processed_dir="${ProjectProcessedDataDir}" \
-                                      --project_log="${ProjectLog}" \
+                                      --project_config="${ProjectConfig}" \
                                       --project_checkpoint="${ProjectCheckpoint}" \
+                                      --phase="${model}" \
                                       --device='cuda'
 
   ;;
@@ -50,21 +66,25 @@ case ${model} in
       set -x
       python "${ProjectBechmarks}"/predict.py \
                               --project_name="${ProjectName}" \
-                              --project_raw_dir="${ProjectRawDataDir}" \
+                              --project_config="${ProjectConfig}" \
+                              --project_raw_dir="${ProjectData}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}" \
+                              --phase="${model}" \
                               --source="There is an imbalance here ."
   ;;
   "val")
       set -x
       python "${ProjectBechmarks}"/evaluate.py \
                               --project_name="${ProjectName}" \
-                              --project_raw_dir="${ProjectRawDataDir}" \
+                              --project_config="${ProjectConfig}" \
+                              --project_raw_dir="${ProjectData}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}" \
-                              --save_result="${ProjectData}"/${ProjectName}_eval.txt
+                              --phase="${model}" \
+                              --save_result="${ProjectProcessedDataDir}"/${ProjectName}_eval.txt
   ;;
    *)
      echo "There is no match case for ${model}"

@@ -191,7 +191,7 @@ class Predictor:
         # (beam_size, seq_len, hidden_size)
         memory_beam = memory.detach().repeat(self.beam_size, 1, 1)
 
-        self.logger.debug("[%s] Memory %s dimension", self.__class__.__name__, memory_beam.shape())
+        self.logger.debug("[%s] Memory %s dimension", self.__class__.__name__, memory_beam.size())
 
         beam = Beam(ctx=self.context,
                     beam_size=self.beam_size,
@@ -214,7 +214,7 @@ class Predictor:
                              self.__class__.__name__, new_inputs.size(), decoder_outputs.size())
 
             attention = self.model.decoder.layers[-1].src_attn.attention
-            self.logger.debug("[%s] attention %s dimension", attention.size())
+            self.logger.debug("[%s] attention %s dimension", self.__class__.__name__, attention.size())
 
             beam.advance(decoder_outputs.squeeze(1), attention)
             if beam.done():
@@ -239,9 +239,9 @@ if __name__ == "__main__":
     logger = context.logger
 
     logger.info('Constructing dictionaries...')
-    source_dictionary = IndexDictionary.load(context.proj_processed_dir, mode='source',
+    source_dictionary = IndexDictionary.load(context.project_processed_dir, mode='source',
                                              vocabulary_size=context.vocabulary_size)
-    target_dictionary = IndexDictionary.load(context.proj_processed_dir, mode='target',
+    target_dictionary = IndexDictionary.load(context.project_processed_dir, mode='target',
                                              vocabulary_size=context.vocabulary_size)
 
     logger.info('Building model...')

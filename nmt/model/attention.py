@@ -21,7 +21,7 @@ def attention(query, key, value, mask=None, dropout=None):
 
 class MultiHeadAttentionWithMetrics(nn.Module):
 
-    def __init__(self, ctx, heads_count, d_model, dropout_prob, mode='self-attention'):
+    def __init__(self, ctx, heads_count, d_model, dropout_prob=0.1, mode='self-attention'):
         super(MultiHeadAttentionWithMetrics, self).__init__()
         assert d_model % heads_count == 0
         assert mode in ('self-attention', 'memory-attention')
@@ -130,6 +130,7 @@ class MultiHeadedAttention(nn.Module):
         self.linears = clones(nn.Linear(d_model, d_model), 4)
         self.attention = None
         self.dropout = nn.Dropout(p=dropout)
+        self.belong = "transformer"
 
     def forward(self, query, key, value, mask=None):
         if mask is not None:
@@ -148,4 +149,5 @@ class MultiHeadedAttention(nn.Module):
         x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
         self.context.logger.debug("[%s] The query %s, key %s, value %s, output %s", self.__class__.__name__,
                                   query.size(), key.size(), value.size(), x.size())
+
         return self.linears[-1](x)

@@ -7,6 +7,7 @@ class Decoder(nn.Module):
         self.context = ctx
         self.d_model = d_model
         self.layers = clones(layer, N)
+
         self.norm = LayerNorm(layer.size)
 
         # Generator Solution 1
@@ -36,6 +37,7 @@ class DecoderLayer(nn.Module):
         self.src_attn = src_attn
         self.feed_forward = feed_forward
         self.sublayer = clones(SublayerConnection(size, dropout), 3)
+        self.index = 0
 
     def forward(self, x, memory, src_mask, tgt_mask):
         m = memory

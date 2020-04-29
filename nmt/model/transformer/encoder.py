@@ -38,6 +38,7 @@ class EncoderLayer(nn.Module):
         self.sublayer = clones(SublayerConnection(size, dropout), 2)
         self.size = size
         self.dropout = nn.Dropout(dropout)
+        self.index = 0
 
     def forward(self, x, mask):
         # x: (batch_size, seq_len, d_model)
