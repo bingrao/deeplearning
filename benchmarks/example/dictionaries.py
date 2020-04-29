@@ -1,6 +1,5 @@
 from collections import Counter
 from os.path import dirname, abspath, join, exists
-from os import makedirs
 
 BASE_DIR = dirname(abspath(__file__))
 

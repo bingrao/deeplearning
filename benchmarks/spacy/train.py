@@ -3,11 +3,10 @@ from torch.autograd import Variable
 from torch import nn
 from nmt.model.transformer.model import build_model
 from nmt.utils.context import Context
-from nmt.train.common import LabelSmoothing
 from nmt.data.batch import batch_size_fn, run_epoch, rebatch
 from nmt.utils.pad import subsequent_mask
 from nmt.data.preprocess import MyIterator
-from nmt.train.common import SimpleLossCompute, MultiGPULossCompute, NoamOpt
+from benchmarks.common import SimpleLossCompute, MultiGPULossCompute, NoamOpt, LabelSmoothing
 
 
 def greedy_decode(model_, src_, src_mask_, max_len, start_symbol):

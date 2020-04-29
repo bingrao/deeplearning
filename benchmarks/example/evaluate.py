@@ -1,7 +1,6 @@
-from nmt.predict import Predictor
-from nmt.model import build_model
-from nmt.data.datasets import TranslationDataset
-from nmt.data import IndexDictionary
+from benchmarks.example.predict import Predictor
+from nmt.model.transformer.model import build_model
+from benchmarks.example.datasets import TranslationDataset, IndexDictionary
 from datetime import datetime
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 from tqdm import tqdm

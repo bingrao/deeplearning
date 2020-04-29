@@ -6,13 +6,14 @@ from datetime import datetime
 import os
 import numpy as np
 import torch
-from nmt.data.datasets import IndexedInputTargetTranslationDataset
-from nmt.data.dictionaries import IndexDictionary
+from torch.optim import Adam
+from torch import nn
+from benchmarks.example.datasets import IndexedInputTargetTranslationDataset
+from benchmarks.example.dictionaries import IndexDictionary
 from nmt.metric.metrics import AccuracyMetric
 from nmt.utils.pipe import input_target_collate_fn
 from nmt.model.transformer.model import build_model
 from nmt.utils.context import Context, create_dir
-from torch.optim import Adam
 
 
 class NoamOptimizer(Adam):

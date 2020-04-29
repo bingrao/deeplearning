@@ -15,12 +15,11 @@ model=$2
 export RootPath=`pwd`
 export PYTHONPATH=${PYTHONPATH}:${RootPath}
 RootSrc=${RootPath}/nmt
-RootData=${RootPath}/data
 CurrentDate=$(date +%F)
-
+ProjectBechmarks=${RootPath}/benchmarks/${ProjectName}
+ProjectData=${RootPath}/data/${ProjectName}
 
 # Project envs
-ProjectData=${RootData}/${ProjectName}
 ProjectRawDataDir=${ProjectData}/raw
 ProjectProcessedDataDir=${ProjectData}/processed
 ProjectConfig=${ProjectData}/configs/${ProjectName}_config.json
@@ -30,7 +29,7 @@ ProjectCheckpoint=${ProjectData}/checkpoints/${CurrentDate}-${ProjectName}-model
 case ${model} in
   "dataset")
       set -x
-      python "${RootSrc}"/data/datasets.py \
+      python "${ProjectBechmarks}"/preprocess.py \
                               --project_name="${ProjectName}" \
                               --project_raw_dir="${ProjectRawDataDir}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \
@@ -40,7 +39,7 @@ case ${model} in
   ;;
   "train")
       set -x
-      python "${RootSrc}"/train/train_${ProjectName}.py \
+      python "${ProjectBechmarks}"/train.py \
                                       --project_name="${ProjectName}" \
                                       --project_raw_dir="${ProjectRawDataDir}" \
                                       --project_processed_dir="${ProjectProcessedDataDir}" \
@@ -52,7 +51,7 @@ case ${model} in
   ;;
   "predict")
       set -x
-      python "${RootSrc}"/predict/predict_${ProjectName}.py \
+      python "${ProjectBechmarks}"/predict.py \
                               --project_name="${ProjectName}" \
                               --project_raw_dir="${ProjectRawDataDir}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \
@@ -63,7 +62,7 @@ case ${model} in
   ;;
   "val")
       set -x
-      python "${RootSrc}"/evaluate/evaluate_${ProjectName}.py \
+      python "${ProjectBechmarks}"/evaluate.py \
                               --project_name="${ProjectName}" \
                               --project_raw_dir="${ProjectRawDataDir}" \
                               --project_processed_dir="${ProjectProcessedDataDir}" \

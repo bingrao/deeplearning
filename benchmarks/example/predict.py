@@ -1,9 +1,18 @@
-from nmt.model import build_model, make_std_mask
-from nmt.data.datasets import IndexedInputTargetTranslationDataset
-from nmt.data import IndexDictionary
-from nmt.predict import Beam
 import torch
+from torch.autograd import Variable
+from nmt.model.transformer.model import build_model
+from benchmarks.example.datasets import IndexedInputTargetTranslationDataset, IndexDictionary
+from benchmarks.beam import Beam
 from nmt.utils.context import Context
+from nmt.utils.pad import subsequent_mask
+
+
+def make_std_mask(tgt, pad):
+    """Create a mask to hide padding and future words."""
+    tgt_mask = (tgt != pad).unsqueeze(-2)
+    tgt_mask = tgt_mask & Variable(
+        subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data))
+    return tgt_mask
 
 
 class Predictor:

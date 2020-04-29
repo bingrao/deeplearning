@@ -4,8 +4,7 @@ from torch.autograd import Variable
 from nmt.data.batch import Batch, run_epoch
 from nmt.model.transformer.model import build_model
 from nmt.utils.context import Context
-from nmt.train.common import LabelSmoothing, SimpleLossCompute, NoamOpt
-
+from benchmarks.common import LabelSmoothing, SimpleLossCompute, NoamOpt
 
 
 def data_gen(voc_size, batch, nbatches):

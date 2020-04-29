@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import math
 from torch.autograd import Variable
-from nmt.utils.pad import subsequent_mask
 
 
 class PositionalEncodingDebug(torch.nn.Module):
@@ -94,10 +93,3 @@ class Embeddings(torch.nn.Module):
     def forward(self, x):
         return self.lut(x) * math.sqrt(self.d_model)
 
-
-def make_std_mask(tgt, pad):
-    """Create a mask to hide padding and future words."""
-    tgt_mask = (tgt != pad).unsqueeze(-2)
-    tgt_mask = tgt_mask & Variable(
-        subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data))
-    return tgt_mask
