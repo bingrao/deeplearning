@@ -47,6 +47,7 @@ case ${model} in
                               --project_processed_dir="${ProjectProcessedDataDir}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}" \
+                              --debug=False \
                               --phase="${model}"
   ;;
   "train")
@@ -56,8 +57,9 @@ case ${model} in
                                       --project_config="${ProjectConfig}" \
                                       --project_raw_dir="${ProjectData}" \
                                       --project_processed_dir="${ProjectProcessedDataDir}" \
-                                      --project_config="${ProjectConfig}" \
+                                      --project_log="${ProjectLog}" \
                                       --project_checkpoint="${ProjectCheckpoint}" \
+                                      --debug=False \
                                       --phase="${model}" \
                                       --device='cuda'
 
@@ -71,6 +73,7 @@ case ${model} in
                               --project_processed_dir="${ProjectProcessedDataDir}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}" \
+                              --debug=False \
                               --phase="${model}" \
                               --source="There is an imbalance here ."
   ;;
@@ -83,8 +86,9 @@ case ${model} in
                               --project_processed_dir="${ProjectProcessedDataDir}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}" \
+                              --debug=False \
                               --phase="${model}" \
-                              --save_result="${ProjectProcessedDataDir}"/${ProjectName}_eval.txt
+                              --save_result="${ProjectProcessedDataDir}"/"${ProjectName}"_eval.txt
   ;;
    *)
      echo "There is no match case for ${model}"

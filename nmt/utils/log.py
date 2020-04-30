@@ -5,7 +5,7 @@ import logging
 BASE_DIR = dirname(dirname(abspath(__file__)))
 
 
-def get_logger(run_name="logs", save_log=None):
+def get_logger(run_name="logs", save_log=None, isDebug=False):
     log_dir = join(BASE_DIR, 'logs')
     if not exists(log_dir):
         os.makedirs(log_dir)
@@ -29,6 +29,7 @@ def get_logger(run_name="logs", save_log=None):
 
         logger.addHandler(file_handler)
         logger.addHandler(stream_handler)
-        logger.setLevel(logging.INFO)
+        debug_level = logging.DEBUG if isDebug else logging.INFO
+        logger.setLevel(debug_level)
 
     return logger

@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
     # For data loading.
     from torchtext import data, datasets
-    logger.info("Preparing dataset ...")
+    logger.info(f"Preparing dataset with batch size {nums_batch}...")
     import spacy
 
     # !pip install torchtext spacy
@@ -269,6 +269,7 @@ if __name__ == "__main__":
                                              lr=0,
                                              betas=(0.9, 0.98),
                                              eps=1e-9))
+        logger.info(f"Training in epoches {epochs} ...")
         for epoch in range(epochs):
             # Set model in train
             model_parallel.train()

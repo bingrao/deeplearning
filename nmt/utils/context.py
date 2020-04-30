@@ -33,17 +33,17 @@ class Context:
 			create_dir(os.path.dirname(self.project_log))
 
 		# logger interface
-		self.logger = get_logger(self.description, self.project_log) if logger is None else logger
+		self.isDebug = self.config["debug"] == 'True'
+		self.logger = get_logger(self.description, self.project_log, self.isDebug) if logger is None else logger
 		self.logger.debug("The logger interface is initited ...")
 
 
-
-		# self.project_config = self.config["project_config"]
-		# if exists(self.project_config):
-		# 	with open(self.project_config) as f:
-		# 		self.config.update(json.load(f))
-		# else:
-		# 	create_dir(join(os.path.dirname(self.project_raw_dir), 'configs'))
+		self.project_config = self.config["project_config"]
+		if exists(self.project_config):
+			with open(self.project_config) as f:
+				self.config.update(json.load(f))
+		else:
+			create_dir(join(os.path.dirname(self.project_raw_dir), 'configs'))
 
 		self.project_save_config = self.config["project_save_config"]
 
@@ -58,12 +58,6 @@ class Context:
 		self.logger.debug("The Input Parameters:")
 		for key, val in self.config.items():
 			self.logger.debug(f"{key} => {val}")
-
-		self.train_src_dataset = self.project_raw_dir + "/raw/src-train.txt"
-		self.train_dst_dataset = self.project_raw_dir + "/raw/tgt-train.txt"
-		self.val_src_dataset = self.project_raw_dir + "/raw/src-val.txt"
-		self.val_dst_dataset = self.project_raw_dir + "/raw/tgt-val.txt"
-		self.test_src_dataset = self.project_raw_dir + "/raw/src-test.txt"
 
 		self.project_processed_dir = self.config["project_processed_dir"]
 		create_dir(self.project_processed_dir)

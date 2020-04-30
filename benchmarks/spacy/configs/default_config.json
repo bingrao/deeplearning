@@ -1,23 +1,20 @@
 {
-  "dataset_limit": null,
-  "print_every": 1,
-  "save_every": 1,
-
-  "vocabulary_size": null,
+  "print_every": 1000,
+  "save_every": 10000,
+  "dataset_limit": 100,
+  "vocabulary_size": 2000,
   "share_dictionary": false,
+  "num_candidates": 3,
   "positional_encoding": true,
-
   "d_model": 128,
   "layers_count": 6,
   "heads_count": 8,
   "d_ff": 128,
-  "dropout_prob": 0.1,
-
+  "dropout": 0.1,
   "label_smoothing": 0.1,
   "optimizer": "Noam",
   "lr": 0.001,
   "clip_grads": true,
-
   "batch_size": 10,
   "epochs": 10
 }

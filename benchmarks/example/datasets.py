@@ -13,11 +13,11 @@ def gen_raw_data(ctx, phase):
     # Load Source Raw dataset
 
     if phase == 'train':
-        src_dir = ctx.train_src_dataset
-        tgt_dir = ctx.train_dst_dataset
+        src_dir = ctx.project_raw_dir + "/raw/src-train.txt"
+        tgt_dir = ctx.project_raw_dir + "/raw/tgt-train.txt"
     else:
-        src_dir = ctx.val_src_dataset
-        tgt_dir = ctx.val_dst_dataset
+        src_dir = ctx.project_raw_dir + "/raw/src-val.txt"
+        tgt_dir = ctx.project_raw_dir + "/raw/tgt-val.txt"
 
     with open(src_dir) as source_file:
         source_data = source_file.readlines()
@@ -92,11 +92,11 @@ class TranslationDatasetOnTheFly:
         self.logger = ctx.logger
 
         if phase == 'train':
-            src_dir = ctx.train_src_dataset
-            tgt_dir = ctx.train_dst_dataset
+            src_dir = ctx.project_raw_dir + "/raw/src-train.txt"
+            tgt_dir = ctx.project_raw_dir + "/raw/tgt-train.txt"
         else:
-            src_dir = ctx.val_src_dataset
-            tgt_dir = ctx.val_dst_dataset
+            src_dir = ctx.project_raw_dir + "/raw/src-val.txt"
+            tgt_dir = ctx.project_raw_dir + "/raw/tgt-val.txt"
 
         with open(src_dir) as source_file:
             self.source_data = source_file.readlines()
