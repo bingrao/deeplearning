@@ -27,8 +27,9 @@ def get_main_argument(desc='Train Transformer'):
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--device_id', type=list, default=[0])
     parser.add_argument('--dataset_limit', type=int, default=100)
-    parser.add_argument('--print_every', type=int, default=1)
-    parser.add_argument('--save_every', type=int, default=1)
+
+    parser.add_argument('--print_every', type=int, default=1000)
+    parser.add_argument('--save_every', type=int, default=10000)
 
     # Model Parameters
     parser.add_argument('--vocabulary_size', type=int, default=1000)

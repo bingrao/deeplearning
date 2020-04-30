@@ -198,9 +198,10 @@ class TransformerTrainer:
 
         return epoch_loss, epoch_metrics
 
-    def run(self, epochs=10):
+    def run(self, epochs=100):
         for epoch in range(self.epoch, epochs + 1):
             self.epoch = epoch
+            self.logger.debug("Train self epoch [%s], epochs [%s]", self.epoch, epochs)
             self.model.train()
             epoch_start_time = datetime.now()
             train_epoch_loss, train_epoch_metrics = self.run_epoch(self.train_dataloader, mode='train')
@@ -210,7 +211,7 @@ class TransformerTrainer:
 
             val_epoch_loss, val_epoch_metrics = self.run_epoch(self.val_dataloader, mode='val')
 
-            if epoch % self.print_every == 0 and self.logger:
+            if (epoch % self.print_every == 0 or epoch == epochs) and self.logger:
                 per_second = len(self.train_dataloader.dataset) / ((epoch_end_time - epoch_start_time).seconds + 1)
                 current_lr = self.optimizer.param_groups[0]['lr']
                 log_message = self.log_format.format(epoch=epoch,
@@ -226,7 +227,7 @@ class TransformerTrainer:
 
                 self.logger.info(log_message)
 
-            if epoch % self.save_every == 0:
+            if epoch % self.save_every == 0 or epoch == epochs:
                 self._save_model(epoch, train_epoch_loss, val_epoch_loss, train_epoch_metrics, val_epoch_metrics)
 
     def _save_model(self, epoch, train_epoch_loss, val_epoch_loss, train_epoch_metrics, val_epoch_metrics):

@@ -109,16 +109,15 @@ if __name__ == "__main__":
 						torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
 	for epoch in range(100):
-		logger.info("Training Epoch %d", epoch)
+		logger.debug("Training Epoch %d", epoch)
 		model.train()
 		run_epoch(data_gen(vocab_size, 30, 20),
 				  model,
 				  SimpleLossCompute(model.generator, criterion, model_opt),
 				  ctx)
 
-		logger.info("Evaluating Epoch %d", epoch)
 		model.eval()
-		logger.info(run_epoch(data_gen(vocab_size, 30, 5),
-							  model,
-							  SimpleLossCompute(model.generator, criterion, None),
-							  ctx))
+		run_epoch(data_gen(vocab_size, 30, 5),
+				  model,
+				  SimpleLossCompute(model.generator, criterion, None),
+				  ctx)
