@@ -18,20 +18,47 @@ class Transformer(nn.Module):
         self.generator = generator
 
     def encode(self, src, src_mask):
-        src_embed = self.src_embed(src)
+        """
+        :param src: a batch of input sentense with 2D dimension (batch_size, seq_len)
+        :param src_mask:
+        :return: a batch of input sentense with encoding embedding, 3D dimentsion (batch_size, seq_len, d_model)
+        """
+        src_embed = self.src_embed(src)     # after src_embed, return src_embed:(batch_size, seq_len, d_model)
         output = self.encoder(src_embed, src_mask)
+        # [Transformer-Encode] The Source torch.Size([10, 35]),
+        #                      src_embed torch.Size([10, 35, 128]),
+        #                      output torch.Size([10, 35, 128]) dimension
         self.context.logger.debug("[%s-Encode] The Source %s, src_embed %s, output %s dimension",
                                   self.__class__.__name__, src.size(), src_embed.size(), output.size())
         return output
 
     def decode(self, tgt, memory, memory_mask, tgt_mask):
+        """
+        :param tgt: The original input of decoder (Shift right one position) with 2D dimension (batch_size, seq_len)
+        :param memory: The output of encoder phase (batch_size, seq_len, d_model)
+        :param memory_mask:
+        :param tgt_mask: The output of decoder phase (batch_size, seq_len, d_model)
+        :return:
+        """
         tgt_embed = self.tgt_embed(tgt)
         output = self.decoder(tgt_embed, memory, memory_mask, tgt_mask)
+        # [Transformer-Decode] The tgt torch.Size([10, 34]),
+        #                          tgt_embed torch.Size([10, 34, 128]),
+        #                          memory torch.Size([10, 33, 128]),
+        #                          output torch.Size([10, 34, 128]) dimension
         self.context.logger.debug("[%s-Decode] The tgt %s, tgt_embed %s, memory %s, output %s dimension",
                                   self.__class__.__name__, tgt.size(), tgt_embed.size(), memory.size(), output.size())
         return output
 
     def forward(self, src, tgt, src_mask=None, tgt_mask=None):
+        """
+
+        :param src: The original input to encoder phase with 2D dimension (batch_size, seq_len)
+        :param tgt: The original input of decoder (Shift right one position) with 2D dimension (batch_size, seq_len)
+        :param src_mask:
+        :param tgt_mask:
+        :return: The output of transformer with 3D (batch_size, seq_len, d_model)
+        """
         # Create mask for src tgt and memory if not provided by user
         from nmt.utils.pad import pad_masking, subsequent_masking
         batch_size, sources_len = src.size()

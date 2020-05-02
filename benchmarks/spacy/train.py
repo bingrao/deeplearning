@@ -85,21 +85,16 @@ class MultiGPULossCompute:
 
     def __call__(self, out, targets, normalize):
         total = 0.0
-        generator = nn.parallel.replicate(self.generator,
-                                          devices=self.devices)
-        out_scatter = nn.parallel.scatter(out,
-                                          target_gpus=self.devices)
+        generator = nn.parallel.replicate(self.generator, devices=self.devices)
+        out_scatter = nn.parallel.scatter(out, target_gpus=self.devices)
         out_grad = [[] for _ in out_scatter]
-        targets = nn.parallel.scatter(targets,
-                                      target_gpus=self.devices)
+        targets = nn.parallel.scatter(targets, target_gpus=self.devices)
 
         # Divide generating into chunks.
         chunk_size = self.chunk_size
         for i in range(0, out_scatter[0].size(1), chunk_size):
             # Predict distributions  requires_grad=self.opt is not None)]
-            out_column = [[Variable(o[:, i:i + chunk_size].data,
-                                    requires_grad=True)]
-                          for o in out_scatter]
+            out_column = [[Variable(o[:, i:i + chunk_size].data, requires_grad=True)] for o in out_scatter]
             gen = nn.parallel.parallel_apply(generator, out_column)
 
             # Compute loss.
@@ -156,18 +151,18 @@ class LabelSmoothing(nn.Module):
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
 
-def greedy_decode(model_, src_, src_mask_, max_len, start_symbol):
-    memory = model_.encode(src_, src_mask_)
-    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src_.data)
+def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    memory = model.encode(src, src_mask)
+    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
     for idx in range(max_len - 1):
-        out_ = model_.decode(memory, src_mask_,
+        out = model.decode(memory, src_mask,
                            Variable(ys),
                            Variable(subsequent_mask(ys.size(1))
-                                    .type_as(src_.data)))
-        prob = model_.generator(out_[:, -1])
+                                    .type_as(src.data)))
+        prob = model.generator(out[:, -1])
         _, next_word = torch.max(prob, dim=1)
         next_word = next_word.data[0]
-        ys = torch.cat([ys, torch.ones(1, 1).type_as(src_.data).fill_(next_word)], dim=1)
+        ys = torch.cat([ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
     return ys
 
 
@@ -179,7 +174,7 @@ if __name__ == "__main__":
 
     # For data loading.
     from torchtext import data, datasets
-    logger.info(f"Preparing dataset with batch size {nums_batch}...")
+    logger.info(f"Preparing dataset with batch size ... ")
     import spacy
 
     # !pip install torchtext spacy
@@ -207,24 +202,21 @@ if __name__ == "__main__":
     TGT = data.Field(tokenize=tokenize_en, init_token=BOS_WORD,
                      eos_token=EOS_WORD, pad_token=BLANK_WORD)
     logger.info("Split datasets into train, val and test using SRC/TGT fileds ...")
-    MAX_LEN = 100
+    MAX_LEN = 150
     # Spilt dataset in root path into train, val, and test dataset
     train, val, test = datasets.IWSLT.splits(
         exts=('.de', '.en'),  # A tuple containing the extension to path for each language.
         fields=(SRC, TGT),  # A tuple containing the fields that will be used for data in each language.
         root=ctx.project_raw_dir,  # Root dataset storage directory.
-        # train='train',  # The prefix of the train data.
-        # validation='val',  # The prefix of the validation data
-        # test='test',  # The prefix of the test data. Default
-        # Filter condition to extract only datasets satifying pred
         filter_pred=lambda x: len(vars(x)['src']) <= MAX_LEN and len(vars(x)['trg']) <= MAX_LEN)
-    MIN_FREQ = 2
+
     logger.info("Build vocabularies for src and tgt ...")
+    MIN_FREQ = 2
     SRC.build_vocab(train.src, min_freq=MIN_FREQ)
     TGT.build_vocab(train.trg, min_freq=MIN_FREQ)
 
     # GPUs to use
-    devices = [0]   # [0, 1, 2, 3]
+    devices = ctx.device_id   #  [0, 1, 2, 3]
     pad_idx = TGT.vocab.stoi["<blank>"]
     logger.info("Build Model ...")
     model = build_model(ctx, len(SRC.vocab), len(TGT.vocab))
@@ -241,9 +233,13 @@ if __name__ == "__main__":
     train_iter = MyIterator(train, batch_size=nums_batch, device=ctx.device,
                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                             batch_size_fn=batch_size_fn, train=True)
+    logger.info(f"Trainning Dataset: epoch[{epochs}], iterations[{train_iter.iterations}], batch size [{nums_batch}]")
+
     valid_iter = MyIterator(val, batch_size=nums_batch, device=ctx.device,
                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                             batch_size_fn=batch_size_fn, train=False)
+
+    logger.info(f"Validate Dataset: epoch[{epochs}], iterations[{valid_iter.iterations}], batch size [{nums_batch}]")
 
     if ctx.is_gpu_parallel:
         # Using multiple GPU resource to train ...
@@ -262,20 +258,17 @@ if __name__ == "__main__":
 
     # Training or load model from checkpoint
     if True:
-        model_opt = NoamOpt(model.src_embed[0].d_model,
-                            1,
-                            2000,
-                            torch.optim.Adam(model.parameters(),
-                                             lr=0,
-                                             betas=(0.9, 0.98),
-                                             eps=1e-9))
-        logger.info(f"Training in epoches {epochs} ...")
+        model_opt = NoamOpt(model_size = model.src_embed[0].d_model,
+                            factor = 1,
+                            warmup = 2000,
+                            optimizer = torch.optim.Adam(model.parameters(),
+                                                         lr=0, betas=(0.9, 0.98), eps=1e-9))
         for epoch in range(epochs):
             # Set model in train
             model_parallel.train()
             run_epoch((rebatch(pad_idx, b) for b in train_iter),
                       model_parallel,
-                      loss_func(model.generator, criterion, ctx.device_id, opt=model_opt),
+                      loss_func(model.generator, criterion, devices, opt=model_opt),
                       ctx)
 
             # Evaluation Model
@@ -284,7 +277,7 @@ if __name__ == "__main__":
             # Get loss
             loss = run_epoch((rebatch(pad_idx, b) for b in valid_iter),
                              model_parallel,
-                             loss_func(model.generator, criterion, ctx.device_id, opt=None),
+                             loss_func(model.generator, criterion, devices, opt=None),
                              ctx)
             logger.info("The loss is %d", loss)
     else:

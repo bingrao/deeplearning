@@ -87,14 +87,16 @@ class LabelSmoothing(nn.Module):
 		return self.criterion(x, Variable(true_dist, requires_grad=False))
 
 
-def data_gen(voc_size, batch, nbatches):
+def data_gen(voc_size, batch, nbatches, seq_len = 15):
 	"""Generate random data for a src-tgt copy task."""
 	for i in range(nbatches):
-		data = torch.from_numpy(np.random.randint(1, voc_size, size=(batch, 10)))
-		data[:, 0] = 1
+		# (batch_size, seq_len)
+		data = torch.from_numpy(
+			np.random.randint(1, voc_size, size=(batch, seq_len)))
+		data[:, 0] = 1 # add start token
 		src = Variable(data, requires_grad=False)
 		tgt = Variable(data, requires_grad=False)
-		yield Batch(src, tgt, 0)
+		yield Batch(src, tgt, 0)  # Accessed by next function one by one
 
 
 if __name__ == "__main__":

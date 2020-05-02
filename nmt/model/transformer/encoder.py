@@ -15,8 +15,9 @@ class Encoder(nn.Module):
 
     def forward(self, x, mask):
         """
-        args:
-           x: embedded_sequence, (batch_size, seq_len, embed_size)
+        :param x: embedded_sequence, (batch_size, seq_len, embed_size)
+        :param mask:
+        :return: encoded_sequence, (batch_size, seq_len, embed_size)
         Pass the input (and mask) through each layer in turn.
         """
         for layer in self.layers:
@@ -28,7 +29,6 @@ class EncoderLayer(nn.Module):
     """
     Encoder is made up of self-attn and feed forward (defined below)
     """
-
     # def __init__(self, d_model, heads_count, d_ff, dropout_prob):
     def __init__(self, ctx, size, self_attn, feed_forward, dropout):
         super(EncoderLayer, self).__init__()
@@ -41,6 +41,11 @@ class EncoderLayer(nn.Module):
         self.index = 0
 
     def forward(self, x, mask):
+        """
+        :param x: encoded/embedded_sequence, (batch_size, seq_len, d_model)
+        :param mask:
+        :return: encoded_sequence, (batch_size, seq_len, d_model)
+        """
         # x: (batch_size, seq_len, d_model)
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         # x = self.dropout(x)  # Optional

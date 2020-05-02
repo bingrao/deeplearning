@@ -15,6 +15,6 @@
   "optimizer": "Noam",
   "lr": 0.001,
   "clip_grads": true,
-  "batch_size": 10,
-  "epochs": 10
+  "batch_size": 400,
+  "epochs": 1
 }

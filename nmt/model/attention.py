@@ -147,6 +147,10 @@ class MultiHeadedAttention(nn.Module):
 
         # 3) "Concat" using a view and apply a final linear.
         x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
+        # [MultiHeadedAttention] The query torch.Size([10, 8, 34, 16]),
+        #                        key torch.Size([10, 8, 34, 16]),
+        #                        value torch.Size([10, 8, 34, 16]),
+        #                        output torch.Size([10, 34, 128])
         self.context.logger.debug("[%s] The query %s, key %s, value %s, output %s", self.__class__.__name__,
                                   query.size(), key.size(), value.size(), x.size())
 
