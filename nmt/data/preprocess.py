@@ -46,7 +46,6 @@ class MyIterator(data.Iterator):
     #                      sort=sort,
     #                      sort_within_batch=sort_within_batch)
     #     self.batches = []
-
     def create_batches(self):
         if self.train:
             def pool(d, random_shuffler):

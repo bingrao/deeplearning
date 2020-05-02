@@ -1,9 +1,7 @@
 from os.path import join, exists
-from nmt.utils.pipe import shared_tokens_generator, source_tokens_generator, target_tokens_generator
 from benchmarks.example.dictionaries import START_TOKEN, END_TOKEN, IndexDictionary
-import logging
 import torch
-from nmt.utils.context import Context
+
 
 UNK_INDEX = 1
 

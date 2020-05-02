@@ -2,7 +2,7 @@
 
 if [ "$#" -ne 2 ] ; then
   echo "Missing Parameters ..."
-  echo "Usage: $0 project[dummy|example|spacy] model[preprocess|train|predict|val] " >&2
+  echo "Usage: $0 project[dummy|example|spacy|learning-fix] model[preprocess|train|predict|val] " >&2
   exit 1
 fi
 CurrentDate=$(date +%F)
@@ -10,6 +10,7 @@ CurrentDate=$(date +%F)
 #ProjectName="spacy"
 #ProjectName="dummy"
 #ProjectName="example"
+#ProjectName="learning-fix"
 ProjectName=$1
 
 # preprocess|train|predict|val
@@ -47,7 +48,7 @@ case ${model} in
                               --project_processed_dir="${ProjectProcessedDataDir}" \
                               --project_log="${ProjectLog}" \
                               --project_checkpoint="${ProjectCheckpoint}" \
-                              --debug=False \
+                              --debug=True \
                               --phase="${model}"
   ;;
   "train")
@@ -92,7 +93,7 @@ case ${model} in
   ;;
    *)
      echo "There is no match case for ${model}"
-     echo "Usage: $0 project[dummy|example|spacy] model[preprocess|train|predict|val] " >&2
+     echo "Usage: $0 project[dummy|example|spacy|learning-fix] model[preprocess|train|predict|val] " >&2
      exit 1
   ;;
 esac

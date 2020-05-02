@@ -1,8 +1,16 @@
-from torch.autograd import Variable
 from nmt.utils.pad import subsequent_mask
 import time
 from tqdm import tqdm
 global max_src_in_batch, max_tgt_in_batch
+from torch.autograd import Variable
+
+
+def make_std_mask(tgt, pad):
+    """Create a mask to hide padding and future words."""
+    tgt_mask = (tgt != pad).unsqueeze(-2)
+    tgt_mask = tgt_mask & Variable(
+        subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data))
+    return tgt_mask
 
 
 def batch_size_fn(new, count, sofar):
@@ -28,16 +36,9 @@ class Batch:
         if trg is not None:
             self.trg = trg[:, :-1] # remove last column
             self.trg_y = trg[:, 1:] # remove first column
-            self.trg_mask = self.make_std_mask(self.trg, pad)
+            self.trg_mask = make_std_mask(self.trg, pad)
             self.ntokens = (self.trg_y != pad).data.sum()
 
-    @staticmethod
-    def make_std_mask(tgt, pad):
-        """Create a mask to hide padding and future words."""
-        tgt_mask = (tgt != pad).unsqueeze(-2)
-        tgt_mask = tgt_mask & Variable(
-            subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data))
-        return tgt_mask
 
 
 def rebatch(pad_idx, batch):
