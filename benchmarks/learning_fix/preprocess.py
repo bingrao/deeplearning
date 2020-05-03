@@ -5,21 +5,11 @@ from nmt.data.batch import Batch
 from torch.autograd import Variable
 import collections
 import torch
+from nmt.utils.context import create_dir
 START_TOKEN = '<Start>'
 END_TOKEN = '<End>'
 UNK_TOKEN = 1000
-
-# class Batch:
-# 	def __init__(self, src, tgt=None, pad=0):
-# 		self.src = src
-# 		self.src_mask = (self.src != pad).unsqueeze(-2)
-# 		if tgt is not None:
-# 			self.tgt = tgt
-# 			self.tgt_in = self.tgt[:, :-1]  # remove last column
-# 			self.tgt_out = self.tgt[:, 1:]  # remove first column
-# 			self.tgt_mask = make_std_mask(self.tgt_in, pad)
-# 			self.ntokens = (self.tgt_out != pad).data.sum()
-
+from torchtext import data
 
 class dataset(Dataset):
 	def __init__(self,
@@ -27,22 +17,29 @@ class dataset(Dataset):
 				 target="train",
 				 dataset="small",
 				 embedding=None,
-				 padding= 0):
+				 padding= 0,
+				 src_vocab=None,
+				 tgt_vocab=None):
 		assert target != "train" or target != "eval" or target != "test"
 		self.context = ctx
 		self.logger = ctx.logger
 		self.target = target
 		self.raw_dir = join(self.context.project_raw_dir, dataset)
-		self.processed_dir = self.context.project_processed_dir
+		self.processed_dir = join(self.context.project_processed_dir, dataset)
+		create_dir(self.processed_dir)
+
+		self.fields = data.Field(tokenize=lambda x:list(x.split()))
 		self.padding = padding
 		self.min_frequency = 0
-		self.max_vocab_size = 250
-		self.src_vocab = self._build_vocab(obj="buggy",
-										   min_frequency=self.min_frequency,
-										   max_vocab_size=self.max_vocab_size)
-		self.tgt_vocab = self._build_vocab(obj="fixed",
-										   min_frequency=self.min_frequency,
-										   max_vocab_size=self.max_vocab_size)
+		self.max_vocab_size = 500
+		if src_vocab is not None:
+			self.src_vocab = src_vocab
+		else:
+			self.src_vocab = self._build_vocab(vocab="buggy", min_frequency=self.min_frequency, max_vocab_size=self.max_vocab_size)
+
+		self.tgt_vocab = tgt_vocab if tgt_vocab is not None else self._build_vocab(vocab="fixed",
+																				   min_frequency=self.min_frequency,
+																				   max_vocab_size=self.max_vocab_size)
 
 		self.token_embedding = embedding
 
@@ -74,16 +71,16 @@ class dataset(Dataset):
 		with open(raw_data_path, 'w') as f1, \
 				open(raw_token_path, 'w') as f2, \
 				open(raw_idx_path, 'w') as f3:
-			for src_line, tgt_line in zip(src_raw_data, tgt_raw_data):
-				src_tokens = self.to_tokenize(src_line)
-				src_index = self.to_embedding(src_tokens, obj="buggy")
-				src_feature = Variable(torch.tensor(src_index).unsqueeze(0),
-							   requires_grad=False)
 
-				tgt_tokens = [START_TOKEN] + self.to_tokenize(tgt_line) + [END_TOKEN]
-				tgt_index = self.to_embedding(tgt_tokens, obj="fixed")
-				tgt_feature = Variable(torch.tensor(tgt_index).unsqueeze(0),
-							   requires_grad=False)
+			for src_line, tgt_line in zip(src_raw_data, tgt_raw_data):
+				# src_tokens = [token for token in src_line.split()]
+				src_tokens = list(src_line.split())
+				src_index = self.to_embedding(src_tokens, vocab=self.src_vocab)
+				src_feature = Variable(torch.tensor(src_index).unsqueeze(0), requires_grad=False)
+
+				tgt_tokens = [START_TOKEN] + list(tgt_line.split()) + [END_TOKEN]
+				tgt_index = self.to_embedding(tgt_tokens, vocab=self.tgt_vocab)
+				tgt_feature = Variable(torch.tensor(tgt_index).unsqueeze(0), requires_grad=False)
 				if self.context.isDebug:
 					f1.write(f'{src_line}\t{tgt_line}\n')
 					f2.write(f'{src_tokens}\t{tgt_tokens}\n')
@@ -92,17 +89,18 @@ class dataset(Dataset):
 				self.data.append(Batch(src_feature, tgt_feature, self.padding))
 
 	def _build_vocab(self,
-					 obj="buggy",
+					 vocab="buggy",
 					 min_frequency=0,
 					 max_vocab_size=250,
 					 downcase=False,
 					 delimiter=" "):
 
-		assert obj != "buggy" or obj != "fixed"
+		assert vocab != "buggy" or vocab != "fixed"
 
+		self.logger.info(f"Building vocab {vocab} with max size {max_vocab_size}")
 		# Counter for all tokens in the vocabulary
 		cnt = collections.Counter()
-		source_path = join(self.raw_dir, "train", f"{obj}.txt")
+		source_path = join(self.raw_dir, "train", f"{vocab}.txt")
 		with open(source_path) as file:
 			for line in file:
 				if downcase:
@@ -132,30 +130,41 @@ class dataset(Dataset):
 			word_with_counts = word_with_counts[:max_vocab_size]
 
 		if self.context.isDebug:
-			with open(join(self.processed_dir, f"vocab.{obj}.txt"), 'w') as file:
+			with open(join(self.processed_dir, f"vocab.{vocab}.txt"), 'w') as file:
 				for idx, (word, count) in enumerate(word_with_counts):
 					file.write(f'{idx}\t{word}\t{count}\n')
 
 		# ['for', 'int', ... , 'float']
-		return [word for word,count in word_with_counts]
+		tokens = [word for word, count in word_with_counts]
+		self.logger.info(f"vocab size is [{len(tokens)}, {tokens[:10]}]")
+		return tokens
 
-	def to_tokenize(self, text):
-		return [token for token in text.split()]
-
-	def to_embedding(self, tokens, obj="buggy"):
-		assert obj != "buggy" or obj != "fixed"
+	def to_embedding(self, tokens, vocab=None):
+		assert vocab is not None
 		if self.token_embedding is not None:
 			return [self.token_embedding(token) for token in tokens]
-		elif obj == "buggy":
-			return [self.src_vocab.index(token)
-					if token in self.src_vocab else UNK_TOKEN for token in tokens]
 		else:
-			return [self.tgt_vocab.index(token)
-					if token in self.tgt_vocab else UNK_TOKEN for token in tokens]
+			return [vocab.index(token) if token in vocab else UNK_TOKEN for token in tokens]
 
 
 
 
 if __name__ == "__main__":
 	context = Context("Learning-fix based on Transformer")
-	train_dataset = dataset(ctx=context, target="train")
+	logger = context.logger
+
+	pad_idx = 0
+	logger.info(f"Preparing train dataset ... ")
+	train_dataset = dataset(ctx=context, target="train",
+							dataset="small", padding=pad_idx, src_vocab=None, tgt_vocab=None)
+
+	src_vocab = train_dataset.src_vocab
+	tgt_vocab = train_dataset.tgt_vocab
+
+	logger.info(f"Preparing eval dataset ... ")
+	eval_dataset = dataset(ctx=context, target="eval",
+						   dataset="small", padding=pad_idx, src_vocab=src_vocab, tgt_vocab=tgt_vocab)
+
+	logger.info(f"Preparing test dataset ... ")
+	test_dataset = dataset(ctx=context, target="test",
+						   dataset="small", padding=pad_idx, src_vocab=src_vocab, tgt_vocab=tgt_vocab)

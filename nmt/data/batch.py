@@ -30,7 +30,7 @@ class Batch:
     """Object for holding a batch of data with mask during training."""
     def __init__(self, src, trg=None, pad=0):
         self.src = src
-
+        self.tgt = trg
         # -1 means last dimension, -2 last second dimension
         self.src_mask = (src != pad).unsqueeze(-2)
         if trg is not None:
@@ -53,7 +53,7 @@ def run_epoch(data_iter, model, loss_compute, ctx):
     total_tokens = 0
     total_loss = 0
     tokens = 0
-    for i, batch in tqdm(enumerate(data_iter)):
+    for i, batch in enumerate(data_iter):
         out = model(batch.src, batch.trg, batch.src_mask, batch.trg_mask)
         loss = loss_compute(out, batch.trg_y, batch.ntokens)
         total_loss += loss
