@@ -42,13 +42,13 @@ class MultiHeadAttentionWithMetrics(nn.Module):
         self.value_projected = None
 
     def forward(self, query, key, value, mask=None, layer_cache=None):
-        self.context.logger.debug('[%s] attention mask %s', self.__class__.__name__, mask)
+        # self.context.logger.debug('[%s] attention mask %s', self.__class__.__name__, mask)
         batch_size, query_len, d_model = query.size()
 
         d_head = d_model // self.heads_count
 
         query_projected = self.query_projection(query)
-        self.context.logger.debug('[%s] query_projected %s', self.__class__.__name__, query_projected.shape)
+        # self.context.logger.debug('[%s] query_projected %s', self.__class__.__name__, query_projected.shape)
 
         if layer_cache is None or layer_cache[self.mode] is None:  # Don't use cache
             key_projected = self.key_projection(key)
@@ -101,8 +101,8 @@ class MultiHeadAttentionWithMetrics(nn.Module):
         context = context_sequence.view(batch_size, query_len, d_model)  # (batch_size, query_len, d_model)
         final_output = self.final_projection(context)
         # print('final_output', final_output.shape)
-        self.context.logger.debug("[%s] The query %s, key %s, value %s, final_output %s dimension",
-            self.__class__.__name__, query.size(), key.size(), value.size(), final_output.size())
+        # self.context.logger.debug("[%s] The query %s, key %s, value %s, final_output %s dimension",
+        #     self.__class__.__name__, query.size(), key.size(), value.size(), final_output.size())
         return final_output
 
     def scaled_dot_product(self, query_heads, key_heads):
@@ -151,7 +151,7 @@ class MultiHeadedAttention(nn.Module):
         #                        key torch.Size([10, 8, 34, 16]),
         #                        value torch.Size([10, 8, 34, 16]),
         #                        output torch.Size([10, 34, 128])
-        self.context.logger.debug("[%s] The query %s, key %s, value %s, output %s", self.__class__.__name__,
-                                  query.size(), key.size(), value.size(), x.size())
+        # self.context.logger.debug("[%s] The query %s, key %s, value %s, output %s", self.__class__.__name__,
+        #                           query.size(), key.size(), value.size(), x.size())
 
         return self.linears[-1](x)
