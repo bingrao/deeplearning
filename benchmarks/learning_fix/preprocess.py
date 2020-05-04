@@ -32,14 +32,18 @@ class dataset(Dataset):
 		self.padding = padding
 		self.min_frequency = 0
 		self.max_vocab_size = 500
+
 		if src_vocab is not None:
 			self.src_vocab = src_vocab
 		else:
-			self.src_vocab = self._build_vocab(vocab="buggy", min_frequency=self.min_frequency, max_vocab_size=self.max_vocab_size)
+			self.src_vocab = self._build_vocab(vocab="buggy",
+											   min_frequency=self.min_frequency,
+											   max_vocab_size=self.max_vocab_size)
 
-		self.tgt_vocab = tgt_vocab if tgt_vocab is not None else self._build_vocab(vocab="fixed",
-																				   min_frequency=self.min_frequency,
-																				   max_vocab_size=self.max_vocab_size)
+		self.tgt_vocab = tgt_vocab if tgt_vocab is not None \
+			else self._build_vocab(vocab="fixed",
+								   min_frequency=self.min_frequency,
+								   max_vocab_size=self.max_vocab_size)
 
 		self.token_embedding = embedding
 
@@ -53,7 +57,8 @@ class dataset(Dataset):
 	def __getitem__(self, idx):
 		# Return a batch representation with
 		# src, tgt_in, tgt_out and masks
-		return self.data[idx]
+		src, tgt = self.data[idx]
+		return src, tgt
 
 	def load(self):
 		src_path = join(self.raw_dir, self.target, "buggy.txt")
@@ -86,7 +91,7 @@ class dataset(Dataset):
 					f2.write(f'{src_tokens}\t{tgt_tokens}\n')
 					f3.write(f'{src_index}\t{tgt_index}\n')
 
-				self.data.append(Batch(src_feature, tgt_feature, self.padding))
+				self.data.append((src_index, tgt_index))
 
 	def _build_vocab(self,
 					 vocab="buggy",
@@ -147,24 +152,26 @@ class dataset(Dataset):
 			return [vocab.index(token) if token in vocab else UNK_TOKEN for token in tokens]
 
 
-
-
-if __name__ == "__main__":
-	context = Context("Learning-fix based on Transformer")
+def dataset_generation(context, data_type="small"):
 	logger = context.logger
+	pad_idx = context.padding_index
 
-	pad_idx = 0
 	logger.info(f"Preparing train dataset ... ")
 	train_dataset = dataset(ctx=context, target="train",
-							dataset="small", padding=pad_idx, src_vocab=None, tgt_vocab=None)
+							dataset=data_type, padding=pad_idx, src_vocab=None, tgt_vocab=None)
 
 	src_vocab = train_dataset.src_vocab
 	tgt_vocab = train_dataset.tgt_vocab
 
 	logger.info(f"Preparing eval dataset ... ")
 	eval_dataset = dataset(ctx=context, target="eval",
-						   dataset="small", padding=pad_idx, src_vocab=src_vocab, tgt_vocab=tgt_vocab)
+						   dataset=data_type, padding=pad_idx, src_vocab=src_vocab, tgt_vocab=tgt_vocab)
 
 	logger.info(f"Preparing test dataset ... ")
 	test_dataset = dataset(ctx=context, target="test",
-						   dataset="small", padding=pad_idx, src_vocab=src_vocab, tgt_vocab=tgt_vocab)
+						   dataset=data_type, padding=pad_idx, src_vocab=src_vocab, tgt_vocab=tgt_vocab)
+
+	return train_dataset, eval_dataset, test_dataset
+
+if __name__ == "__main__":
+	run(Context("Learning-fix based on Transformer"))

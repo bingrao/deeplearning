@@ -80,6 +80,7 @@ class Context:
 		self.batch_size = self.config["batch_size"]
 		self.epochs = self.config["epochs"]
 		self.vocabulary_size = self.config["vocabulary_size"]
+		self.padding_index = 0
 
 		self.dataset_limit = self.config["dataset_limit"]
 		self.print_every = self.config["print_every"]

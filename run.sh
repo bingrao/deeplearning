@@ -60,7 +60,7 @@ case ${model} in
                                       --project_processed_dir="${ProjectProcessedDataDir}" \
                                       --project_log="${ProjectLog}" \
                                       --project_checkpoint="${ProjectCheckpoint}" \
-                                      --debug=False \
+                                      --debug=True \
                                       --phase="${model}" \
                                       --device='cuda'
 

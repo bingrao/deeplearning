@@ -92,7 +92,7 @@ class PositionwiseFeedForward(nn.Module):
         Args:
              x: (batch_size, seq_len, d_model)
         """
-        return self.feed_forward(x)
-        # return self.w_2(self.dropout(F.relu(self.w_1(x))))
+        # return self.feed_forward(x)
+        return self.w_2(self.dropout(F.relu(self.w_1(x))))
 
 

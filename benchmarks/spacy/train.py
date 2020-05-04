@@ -1,12 +1,73 @@
 from nmt.model.transformer.model import build_model
 from nmt.utils.context import Context
-from nmt.data.batch import batch_size_fn, run_epoch, rebatch
+from nmt.data.batch import Batch
 from nmt.utils.pad import subsequent_mask
-from nmt.data.preprocess import MyIterator
-import torch.nn as nn
+from torchtext import data
 from torch.autograd import Variable
+from torch import nn
 import torch
+import time
 
+
+global max_src_in_batch, max_tgt_in_batch
+def batch_size_fn(new, count, sofar):
+    """Keep augmenting batch and calculate total number of tokens + padding."""
+    global max_src_in_batch, max_tgt_in_batch
+    if count == 1:
+        max_src_in_batch = 0
+        max_tgt_in_batch = 0
+    max_src_in_batch = max(max_src_in_batch, len(new.src))
+    max_tgt_in_batch = max(max_tgt_in_batch, len(new.trg) + 2)
+    src_elements = count * max_src_in_batch
+    tgt_elements = count * max_tgt_in_batch
+    return max(src_elements, tgt_elements)
+
+class MyIterator(data.Iterator):
+    """Defines an iterator that loads batches of data from a Dataset.
+
+       Attributes:
+           dataset: The Dataset object to load Examples from.
+           batch_size: Batch size.
+           batch_size_f: Function of three arguments (new example to add, current
+               count of examples in the batch, and current effective batch size)
+               that returns the new effective batch size resulting from adding
+               that example to a batch. This is useful for dynamic batching, where
+               this function would add to the current effective batch size the
+               number of tokens in the new example.
+           sort_key: A key to use for sorting examples in order to batch together
+               examples with similar lengths and minimize padding. The sort_key
+               provided to the Iterator constructor overrides the sort_key
+               attribute of the Dataset, or defers to it if None.
+           train: Whether the iterator represents a train set.
+           repeat: Whether to repeat the iterator for multiple epochs. Default: False.
+           shuffle: Whether to shuffle examples between epochs.
+           sort: Whether to sort examples according to self.sort_key.
+               Note that shuffle and sort default to train and (not train).
+           sort_within_batch: Whether to sort (in descending order according to
+               self.sort_key) within each batch. If None, defaults to self.sort.
+               If self.sort is True and this is False, the batch is left in the
+               original (ascending) sorted order.
+           device (str or `torch.device`): A string or instance of `torch.device`
+               specifying which device the Variables are going to be created on.
+               If left as default, the tensors will be created on cpu. Default: None.
+       """
+
+    def create_batches(self):
+        if self.train:
+            def pool(d, random_shuffler):
+                for p in data.batch(d, self.batch_size * 100):
+                    p_batch = data.batch(
+                        sorted(p, key=self.sort_key),
+                        self.batch_size, self.batch_size_fn)
+                    for b in random_shuffler(list(p_batch)):
+                        yield b
+
+            self.batches = pool(self.data(), self.random_shuffler)
+
+        else:
+            self.batches = []
+            for b in data.batch(self.data(), self.batch_size, self.batch_size_fn):
+                self.batches.append(sorted(b, key=self.sort_key))
 
 class NoamOpt:
     """Optim wrapper that implements rate."""
@@ -36,11 +97,9 @@ class NoamOpt:
                (self.model_size ** (-0.5) *
                 min(step ** (-0.5), step * self.warmup ** (-1.5)))
 
-
 def get_std_opt(model):
     return NoamOpt(model.context.d_model, 2, 4000,
                    torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
-
 
 class SimpleLossCompute:
     """A simple loss compute and train function."""
@@ -60,7 +119,6 @@ class SimpleLossCompute:
         # https://github.com/pytorch/pytorch/issues/15585
         # return loss.data[0] * norm
         return loss.data.item() * norm
-
 
 # Finally to really target fast training, we will use multi-gpu.
 # This code implements multi-gpu word generation. It is not specific to
@@ -125,7 +183,6 @@ class MultiGPULossCompute:
             self.opt.optimizer.zero_grad()
         return total * normalize
 
-
 class LabelSmoothing(nn.Module):
     """Implement label smoothing."""
 
@@ -150,7 +207,6 @@ class LabelSmoothing(nn.Module):
         self.true_dist = true_dist
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
-
 def greedy_decode(model, src, src_mask, max_len, start_symbol):
     memory = model.encode(src, src_mask)
     ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
@@ -165,8 +221,32 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
         ys = torch.cat([ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
     return ys
 
+def rebatch(pad_idx, batch):
+    """Fix order in torchtext to match ours"""
+    src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
+    return Batch(src, trg, pad_idx)
 
-if __name__ == "__main__":
+def run_epoch(data_iter, model, loss_compute, ctx):
+    """Standard Training and Logging Function"""
+    start = time.time()
+    total_tokens = 0
+    total_loss = 0
+    tokens = 0
+    for i, batch in enumerate(data_iter):
+        out = model(batch.src, batch.trg, batch.src_mask, batch.trg_mask)
+        loss = loss_compute(out, batch.trg_y, batch.ntokens)
+        total_loss += loss
+        total_tokens += batch.ntokens
+        tokens += batch.ntokens
+        if i % 50 == 1:
+            elapsed = time.time() - start
+            ctx.logger.info("Epoch Step: %d Loss: %f Tokens per Sec: %f",
+                            i, loss / batch.ntokens, tokens / elapsed)
+            start = time.time()
+            tokens = 0
+    return total_loss / total_tokens
+
+def run():
     ctx = Context("Train_MultiGPU")
     logger = ctx.logger
     nums_batch = ctx.batch_size
@@ -304,3 +384,5 @@ if __name__ == "__main__":
         print()
         break
 
+if __name__ == "__main__":
+    run()
