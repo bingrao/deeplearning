@@ -18,6 +18,9 @@ def get_logger(run_name="logs", save_log=None, isDebug=False):
 
     logger = logging.getLogger(run_name)
 
+    debug_level = logging.DEBUG if isDebug else logging.INFO
+    logger.setLevel(debug_level)
+
     if not logger.handlers:  # execute only if logger doesn't already exist
         file_handler = logging.FileHandler(log_filepath, 'w', 'utf-8')
         stream_handler = logging.StreamHandler(os.sys.stdout)
@@ -29,7 +32,5 @@ def get_logger(run_name="logs", save_log=None, isDebug=False):
 
         logger.addHandler(file_handler)
         logger.addHandler(stream_handler)
-        debug_level = logging.DEBUG if isDebug else logging.INFO
-        logger.setLevel(debug_level)
 
     return logger

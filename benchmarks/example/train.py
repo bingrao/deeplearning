@@ -122,18 +122,17 @@ class TransformerTrainer:
 
         self.logger = ctx.logger
         self.proj_processed_dir = ctx.project_processed_dir
+        self.context = ctx
 
         self.device = ctx.device
         self.run_name = run_name
-        self.model = model.to(self.device)
+        self.model = model.to(self.device) if ctx.is_cuda else model
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
-
-        self.loss_function = loss_function.to(self.device)
+        self.loss_function = loss_function.to(self.device) if ctx.is_cuda else model
         self.metric_function = metric_function
         self.optimizer = optimizer
         self.clip_grads = ctx.clip_grads
-
 
         self.checkpoint = ctx.project_checkpoint
         self.checkpoint_dir = join(os.path.dirname(ctx.project_raw_dir),'checkpoints', run_name)
@@ -149,7 +148,6 @@ class TransformerTrainer:
 
         self.best_val_metric = None
         self.best_checkpoint_filepath = None
-
 
         self.save_format = 'epoch={epoch:0>3}-val_loss={val_loss:<.3}-val_metrics={val_metrics}.pth'
 
@@ -169,7 +167,9 @@ class TransformerTrainer:
         batch_counts = []
         batch_metrics = []
         for sources, inputs, targets in tqdm(dataloader):
-            sources, inputs, targets = sources.to(self.device), inputs.to(self.device), targets.to(self.device)
+            sources = sources.to(self.device) if self.context.is_cuda else sources
+            inputs = inputs.to(self.device) if self.context.is_cuda else inputs
+            targets = targets.to(self.device) if self.context.is_cuda else targets
             outputs = self.model(sources, inputs)
             batch_loss, batch_count = self.loss_function(outputs, targets)
 

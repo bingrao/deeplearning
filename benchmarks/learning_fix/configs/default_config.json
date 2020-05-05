@@ -2,7 +2,7 @@
   "print_every": 1000,
   "save_every": 10000,
   "dataset_limit": 100,
-  "vocabulary_size": 2000,
+  "vocabulary_size": 400,
   "share_dictionary": false,
   "num_candidates": 3,
   "positional_encoding": true,

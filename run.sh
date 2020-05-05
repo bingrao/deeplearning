@@ -62,7 +62,7 @@ case ${model} in
                                       --project_checkpoint="${ProjectCheckpoint}" \
                                       --debug=True \
                                       --phase="${model}" \
-                                      --device='cuda'
+                                      --device='cpu'
 
   ;;
   "predict")

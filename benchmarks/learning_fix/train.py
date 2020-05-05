@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader
 import numpy as np
 import time
 from nmt.data.batch import Batch
+
+
 class NoamOpt:
     """Optim wrapper that implements rate."""
 
@@ -37,11 +39,14 @@ class NoamOpt:
                (self.model_size ** (-0.5) *
                 min(step ** (-0.5), step * self.warmup ** (-1.5)))
 
+
 def get_std_opt(model):
-    return NoamOpt(model,factor=1, warmup=2000,
+    return NoamOpt(model, factor=1, warmup=2000,
                    optimizer=torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
+
 PAD_INDEX = 0
+
 
 def input_target_collate_fn(batch):
     """merges a list of samples to form a mini-batch."""
@@ -61,10 +66,9 @@ def input_target_collate_fn(batch):
     return Batch(sources_tensor, targets_tensor, PAD_INDEX)
 
 
-
-
 class SimpleLossComputeWithLablSmoothing:
     """A simple loss compute and train function."""
+
     def __init__(self, generator, criterion, devices=None, opt=None):
         self.generator = generator
         self.criterion = criterion
@@ -85,8 +89,10 @@ class SimpleLossComputeWithLablSmoothing:
         # return loss.data[0] * norm
         return loss.data.item() * norm
 
+
 class SimpleLossCompute:
     """A simple loss compute and train function."""
+
     def __init__(self, generator, criterion, opt=None):
         self.generator = generator
         self.criterion = criterion
@@ -94,7 +100,6 @@ class SimpleLossCompute:
         self.base_loss_function = nn.CrossEntropyLoss(reduction='sum', ignore_index=0)
 
     def __call__(self, x, y, norm=1):
-
         batch_size, seq_len, vocabulary_size = x.size()
 
         outputs_flat = x.view(batch_size * seq_len, vocabulary_size)
@@ -108,6 +113,7 @@ class SimpleLossCompute:
             self.opt.step()
             self.opt.optimizer.zero_grad()
         return loss, count
+
 
 class LabelSmoothing(nn.Module):
     """Implement label smoothing."""
@@ -135,6 +141,7 @@ class LabelSmoothing(nn.Module):
         # print(f"true_dist {true_dist}")
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
+
 class DataProcessEngine:
     def __init__(self, context):
         self.context = context
@@ -146,7 +153,6 @@ class DataProcessEngine:
 
         self.src_vocab = None
         self.tgt_vocab = None
-
 
         self.model = None
         self.nums_batch = context.batch_size
@@ -185,7 +191,6 @@ class DataProcessEngine:
         self.model.cuda() if self.context.is_cuda else None
         self.logger.debug(self.model)
 
-
     def run(self, loss_func=None, opt=None):
         criterion = LabelSmoothing(size=len(self.tgt_vocab), padding_idx=self.padding_index, smoothing=0.1)
         criterion.cuda() if self.context.is_cuda else None
@@ -196,7 +201,6 @@ class DataProcessEngine:
             self.model.train()
             self.run_epoch(self.train_iter,
                            loss_func(self.model.generator, criterion, opt=opt))
-
 
             # Evaluation Model
             self.model.eval()
@@ -216,14 +220,14 @@ class DataProcessEngine:
         tokens = 0
         for i, batch in enumerate(data_iter):
 
-            src = batch.src.to(self.context.device)
-            trg = batch.trg.to(self.context.device)
-            trg_y = batch.trg_y.to(self.context.device)
-            src_mask = batch.src_mask.to(self.context.device)
-            tgt_mask = batch.trg_mask.to(self.context.device)
+            src = batch.src.to(self.context.device) if self.context.is_cuda else batch.src
+            trg = batch.trg.to(self.context.device) if self.context.is_cuda else batch.trg
+            trg_y = batch.trg_y.to(self.context.device) if self.context.is_cuda else batch.trg_y
+            src_mask = batch.src_mask.to(self.context.device) if self.context.is_cuda else batch.src_mask
+            tgt_mask = batch.trg_mask.to(self.context.device) if self.context.is_cuda else batch.trg_mask
 
             # Model forward and output result
-            out = self.model(src, trg)
+            out = self.model(src, trg, src_mask, tgt_mask)
 
             # Get loss for this iteration and backward weight to model
             loss = loss_compute(out, trg_y, batch.ntokens)
@@ -234,7 +238,7 @@ class DataProcessEngine:
             if i % 50 == 1:
                 elapsed = time.time() - start
                 self.logger.info("Epoch Step: %d Loss: %f Tokens per Sec: %f",
-                                i, loss / batch.ntokens, tokens / elapsed)
+                                 i, loss / batch.ntokens, tokens / elapsed)
                 start = time.time()
                 tokens = 0
 
@@ -242,6 +246,7 @@ class DataProcessEngine:
 
     def postprocess(self):
         pass
+
 
 if __name__ == "__main__":
     ctx = Context(desc="Learning-fix based on Transformer")
