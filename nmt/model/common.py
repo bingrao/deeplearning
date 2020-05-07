@@ -2,15 +2,15 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-
+"""
+Simple layers
+https://nn.readthedocs.io/en/rtd/simple/index.html
+"""
 def clones(module, N):
     """
     Produce N identical layers.
     """
-
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
-
 
 class LayerNorm(nn.Module):
     """
@@ -28,7 +28,6 @@ class LayerNorm(nn.Module):
         mean = x.mean(dim=-1, keepdim=True)
         std = x.std(dim=-1, keepdim=True)
         return self.gain * (x - mean) / (std + self.epsilon) + self.bias
-
 
 class SublayerConnection(nn.Module):
     """
@@ -49,16 +48,17 @@ class SublayerConnection(nn.Module):
         reg = self.norm((x + self.dropout(sublayer(x))))
         return reg
 
-
 class Generator(nn.Module):
     """Define standard linear + softmax generation step."""
     def __init__(self, d_model, vocab):
         super(Generator, self).__init__()
+        # y = A*x + B,
+        # where x.Size = d_model is input dimension,
+        # and y.size = vocab is output dimension
         self.proj = nn.Linear(d_model, vocab)
 
     def forward(self, x):
         return F.log_softmax(self.proj(x), dim=-1)
-
 
 class PositionwiseFeedForward(nn.Module):
     """
@@ -85,14 +85,14 @@ class PositionwiseFeedForward(nn.Module):
         self.feed_forward = nn.Sequential(self.w_1, self.dropout, self.relu, self.w_2, self.dropout)
 
         # Solution 2: https://nlp.seas.harvard.edu/2018/04/03/attention.html
-        self.feed_forward_v1 = nn.Sequential(self.w_1, self.relu, self.dropout, self.w_2)
+        # self.w_2(self.dropout(F.relu(self.w_1(x))))
+        self.feed_forward_simply = nn.Sequential(self.w_1, self.relu, self.dropout, self.w_2)
 
     def forward(self, x):
         """
         Args:
              x: (batch_size, seq_len, d_model)
         """
-        # return self.feed_forward(x)
-        return self.w_2(self.dropout(F.relu(self.w_1(x))))
+        return self.feed_forward_simply(x)
 
 

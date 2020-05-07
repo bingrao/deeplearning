@@ -60,22 +60,25 @@ class Transformer(nn.Module):
         :return: The output of transformer with 3D (batch_size, seq_len, d_model)
         """
         # Create mask for src tgt and memory if not provided by user
-        from nmt.utils.pad import pad_masking, subsequent_masking
-        batch_size, sources_len = src.size()
-        batch_size, inputs_len = tgt.size()
-        if src_mask is None:
-            src_mask = pad_masking(src, sources_len)
-            memory_mask = pad_masking(src, inputs_len)
-        else:
-            memory_mask = src_mask
-        if tgt_mask is None:
-            tgt_mask = subsequent_masking(tgt) | pad_masking(tgt, inputs_len)
+        # Here, we should not provide mask for src and tgt since we do not know
+        # the details of input training dataset.
+
+        # from nmt.utils.pad import pad_masking, subsequent_masking
+        # batch_size, sources_len = src.size()
+        # batch_size, inputs_len = tgt.size()
+        # if src_mask is None:
+        #     src_mask = pad_masking(src, sources_len)
+        #     memory_mask = pad_masking(src, inputs_len)
+        # else:
+        #     memory_mask = src_mask
+        # if tgt_mask is None:
+        #     tgt_mask = subsequent_masking(tgt) | pad_masking(tgt, inputs_len)
 
         # Get encoder output, (batch_size, seq_len, d_model)
         memory = self.encode(src, src_mask)  # Context Vectors
 
         # Get decoder output, (batch_size, seq_len, d_model)
-        outputs = self.decode(tgt, memory, memory_mask, tgt_mask)
+        outputs = self.decode(tgt, memory, src_mask, tgt_mask)
         return outputs
 
 
@@ -114,5 +117,4 @@ def build_model(ctx, src_vocab_size, tgt_vocab_size):
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
-
     return model

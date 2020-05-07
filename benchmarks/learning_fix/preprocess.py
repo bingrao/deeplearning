@@ -6,7 +6,6 @@ from torchtext import data
 
 START_TOKEN = '<Start>'
 END_TOKEN = '<End>'
-UNK_TOKEN = 0
 
 
 class LFDataset(Dataset):
@@ -75,7 +74,6 @@ class LFDataset(Dataset):
                 open(raw_idx_path, 'w') as f3:
 
             for src_line, tgt_line in zip(src_raw_data, tgt_raw_data):
-                # src_tokens = [token for token in src_line.split()]
                 src_tokens = list(src_line.split())
                 src_index = self.to_embedding(src_tokens, vocab=self.src_vocab)
                 # src_feature = Variable(torch.tensor(src_index).unsqueeze(0), requires_grad=False)
@@ -99,8 +97,8 @@ class LFDataset(Dataset):
                      delimiter=" "):
 
         assert vocab != "buggy" or vocab != "fixed"
-
         self.logger.info(f"Building vocab {vocab} with max size {max_vocab_size}")
+
         # Counter for all tokens in the vocabulary
         cnt = collections.Counter()
         source_path = join(self.raw_dir, "train", f"{vocab}.txt")

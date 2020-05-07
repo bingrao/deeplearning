@@ -1,6 +1,4 @@
-
 from nmt.model.common import *
-
 
 class Encoder(nn.Module):
     """
@@ -24,21 +22,18 @@ class Encoder(nn.Module):
             x = layer(x, mask)
         return self.norm(x)
 
-
 class EncoderLayer(nn.Module):
     """
     Encoder is made up of self-attn and feed forward (defined below)
     """
-    # def __init__(self, d_model, heads_count, d_ff, dropout_prob):
-    def __init__(self, ctx, size, self_attn, feed_forward, dropout):
+    def __init__(self, ctx, d_model, self_attn, feed_forward, dropout):
         super(EncoderLayer, self).__init__()
         self.context = ctx
         self.self_attn = self_attn
         self.feed_forward = feed_forward
-        self.sublayer = clones(SublayerConnection(size, dropout), 2)
-        self.size = size
+        self.sublayer = clones(SublayerConnection(d_model, dropout), 2)
+        self.size = d_model
         self.dropout = nn.Dropout(dropout)
-        self.index = 0
 
     def forward(self, x, mask):
         """

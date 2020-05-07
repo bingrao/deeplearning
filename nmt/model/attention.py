@@ -1,4 +1,3 @@
-import copy
 import math
 import numpy as np
 import torch
@@ -6,9 +5,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from nmt.model.common import clones
 
-
 def attention(query, key, value, mask=None, dropout=None):
-    """Compute 'Scaled Dot Product Attention'"""
+    """
+    Compute 'Scaled Dot Product Attention'
+    :param query:
+    :param key:
+    :param value:
+    :param mask:
+    :param dropout:
+    :return:
+    """
     d_k = query.size(-1)
     scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
     if mask is not None:
@@ -17,7 +23,6 @@ def attention(query, key, value, mask=None, dropout=None):
     if dropout is not None:
         p_attn = dropout(p_attn)
     return torch.matmul(p_attn, value), p_attn
-
 
 class MultiHeadAttentionWithMetrics(nn.Module):
 
@@ -117,7 +122,6 @@ class MultiHeadAttentionWithMetrics(nn.Module):
         attention_weights = dot_product / np.sqrt(self.d_head)
         return attention_weights
 
-
 class MultiHeadedAttention(nn.Module):
     def __init__(self, ctx, h, d_model, dropout=0.1):
         """Take in model size and number of heads."""
@@ -130,7 +134,6 @@ class MultiHeadedAttention(nn.Module):
         self.linears = clones(nn.Linear(d_model, d_model), 4)
         self.attention = None
         self.dropout = nn.Dropout(p=dropout)
-        self.belong = "transformer"
 
     def forward(self, query, key, value, mask=None):
         if mask is not None:
